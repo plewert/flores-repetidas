@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🌸 Flores Repetidas</title>
+<style>
+  :root {
+    --bg: #fff5f8; --card: #ffffff; --texto: #3b2a33; --suave: #8a7580;
+    --rosa: #e0457b; --rosa-claro: #fde3ec; --verde: #3aa76d; --borde: #f0d4de;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1419; --card: #2a1e25; --texto: #f5e8ee; --suave: #b79ba8;
+      --rosa: #ff6b9d; --rosa-claro: #3d2631; --verde: #5fd194; --borde: #4a3340;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--texto);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; justify-content: center; padding: 16px;
+  }
+  main { width: 100%; max-width: 520px; }
+  h1 { text-align: center; margin: 8px 0 16px; font-size: 1.8rem; }
+  .panel {
+    background: var(--card); border: 1px solid var(--borde); border-radius: 16px;
+    padding: 18px; margin-bottom: 14px;
+  }
+  input {
+    width: 100%; padding: 12px; font-size: 1rem; border-radius: 10px;
+    border: 1px solid var(--borde); background: var(--bg); color: var(--texto);
+    margin-bottom: 10px;
+  }
+  button {
+    width: 100%; padding: 12px; font-size: 1rem; border: 0; border-radius: 10px;
+    background: var(--rosa); color: #fff; font-weight: 600; cursor: pointer; margin-bottom: 8px;
+  }
+  button.sec { background: var(--rosa-claro); color: var(--rosa); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .oculto { display: none !important; }
+  .codigo {
+    font-size: 2.2rem; letter-spacing: 8px; text-align: center; font-weight: 800;
+    color: var(--rosa); margin: 6px 0;
+  }
+  .centro { text-align: center; color: var(--suave); }
+  .jugadores { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .jug {
+    flex: 1 1 45%; padding: 8px 12px; border-radius: 12px; border: 2px solid var(--borde);
+    background: var(--card); display: flex; justify-content: space-between; font-weight: 600;
+  }
+  .jug.turno { border-color: var(--rosa); background: var(--rosa-claro); }
+  .tablero { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .carta {
+    aspect-ratio: 1; border-radius: 14px; border: 2px solid var(--borde);
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(1.8rem, 11vw, 3rem); cursor: pointer; user-select: none;
+    background: var(--rosa); transition: transform .2s, background .2s;
+  }
+  .carta.oculta::after { content: "🌿"; opacity: .85; }
+  .carta.volteada { background: var(--card); transform: scale(1.04); }
+  .carta.emparejada { background: var(--rosa-claro); border-color: var(--verde); cursor: default; }
+  .mensaje { text-align: center; min-height: 1.6em; margin: 12px 0 0; font-weight: 600; }
+  .error { color: #d33; text-align: center; min-height: 1.4em; }
+  .fin { text-align: center; }
+  .fin h2 { margin: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🌸 Flores Repetidas</h1>
+
+  <!-- LOBBY -->
+  <section id="lobby" class="panel">
+    <input id="nombre" placeholder="Tu nombre" maxlength="16">
+    <button id="btnCrear">Crear sala</button>
+    <p class="centro">— o únete con un código —</p>
+    <input id="codigoIn" placeholder="CÓDIGO" maxlength="4" style="text-transform:uppercase;text-align:center;letter-spacing:6px">
+    <button id="btnUnirse" class="sec">Unirse a sala</button>
+    <div id="errorLobby" class="error"></div>
+  </section>
+
+  <!-- ESPERA -->
+  <section id="espera" class="panel oculto">
+    <p class="centro">Comparte este código con tus amigos:</p>
+    <div id="codigoSala" class="codigo"></div>
+    <div id="listaEspera" class="jugadores"></div>
+    <button id="btnIniciar">Iniciar partida</button>
+    <p id="msgEspera" class="centro"></p>
+    <div id="errorEspera" class="error"></div>
+  </section>
+
+  <!-- JUEGO -->
+  <section id="juego" class="oculto">
+    <div id="marcador" class="jugadores"></div>
+    <div id="tablero" class="tablero"></div>
+    <div id="mensaje" class="mensaje"></div>
+    <div id="fin" class="panel fin oculto" style="margin-top:14px">
+      <h2 id="finTitulo"></h2>
+      <p id="finDetalle" class="centro"></p>
+      <button id="btnReiniciar">Jugar otra vez</button>
+    </div>
+  </section>
+</main>
+
+<script>
+// Dirección del servidor Node. Si abres este archivo fuera de http://localhost:3000
+// (doble clic, Live Server, etc.) se conecta a localhost:3000. Cámbiala si hace falta.
+const ES_LOCAL = ["localhost", "127.0.0.1", ""].includes(location.hostname);
+const URL_SERVIDOR = ES_LOCAL && location.port !== "3000" ? "http://localhost:3000" : location.origin;
+
+function cargarScript(src) {
+  return new Promise((ok, fallo) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = ok; s.onerror = fallo;
+    document.head.appendChild(s);
+  });
+}
+
+(async function () {
+  try { await cargarScript(URL_SERVIDOR + "/socket.io/socket.io.js"); }
+  catch (e) {
+    try { await cargarScript("https://cdn.socket.io/4.7.5/socket.io.min.js"); }
+    catch (e2) {
+      document.querySelector("main").insertAdjacentHTML("beforeend",
+        '<p class="error">No se pudo cargar Socket.IO. ¿Está corriendo <b>node server.js</b>?</p>');
+      return;
+    }
+  }
+  iniciar();
+})();
+
+function iniciar() {
+const socket = io(URL_SERVIDOR);
+socket.on("connect_error", () => {
+  const el = document.getElementById("errorLobby");
+  if (el) el.textContent = "No se puede conectar al servidor. Ejecuta: node server.js";
+});
+const $ = (id) => document.getElementById(id);
+
+let miId = null;
+let estado = null;
+
+// ---------- lobby ----------
+$("btnCrear").onclick = () => {
+  socket.emit("crearSala", { nombre: $("nombre").value }, (r) => {
+    if (!r.ok) return ($("errorLobby").textContent = r.error);
+    miId = r.id;
+  });
+};
+$("btnUnirse").onclick = () => {
+  socket.emit("unirseSala", { codigo: $("codigoIn").value, nombre: $("nombre").value }, (r) => {
+    if (!r.ok) return ($("errorLobby").textContent = r.error);
+    miId = r.id;
+  });
+};
+$("btnIniciar").onclick = () => {
+  socket.emit("iniciar", null, (r) => {
+    $("errorEspera").textContent = r.ok ? "" : r.error;
+  });
+};
+$("btnReiniciar").onclick = () => socket.emit("reiniciar");
+
+// ---------- eventos del servidor ----------
+socket.on("estado", (e) => {
+  estado = e;
+  if (!miId) miId = socket.id;
+  pintar();
+});
+
+socket.on("pareja", ({ jugador, flor }) => {
+  mostrarMensaje(`¡${jugador} encontró una pareja de ${flor}!`);
+});
+
+socket.on("finJuego", ({ ganadores, empate, puntos, motivo }) => {
+  $("finTitulo").textContent = empate
+    ? `🤝 Empate: ${ganadores.join(" y ")}`
+    : `🏆 Ganó ${ganadores[0]}`;
+  $("finDetalle").textContent = `${puntos} pareja${puntos === 1 ? "" : "s"}` + (motivo ? ` · ${motivo}` : "");
+});
+
+let timerMsg;
+let msgTemporal = false;
+function mostrarMensaje(txt) {
+  msgTemporal = true;
+  $("mensaje").textContent = txt;
+  clearTimeout(timerMsg);
+  timerMsg = setTimeout(() => { msgTemporal = false; pintar(); }, 2500);
+}
+
+// ---------- pintar ----------
+function chipJugador(j, turnoId) {
+  const yo = j.id === miId ? " (tú)" : "";
+  const cls = "jug" + (j.id === turnoId ? " turno" : "");
+  return `<div class="${cls}"><span>${esc(j.nombre)}${yo}</span><span>🌸 ${j.puntos}</span></div>`;
+}
+
+function esc(s) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function pintar() {
+  const e = estado;
+  const enSala = !!e;
+  $("lobby").classList.toggle("oculto", enSala);
+  $("espera").classList.toggle("oculto", !enSala || e.fase !== "espera");
+  $("juego").classList.toggle("oculto", !enSala || e.fase === "espera");
+  if (!enSala) return;
+
+  const soyHost = e.host === miId;
+
+  if (e.fase === "espera") {
+    $("codigoSala").textContent = e.codigo;
+    $("listaEspera").innerHTML = e.jugadores.map((j) => chipJugador(j, null)).join("");
+    $("btnIniciar").classList.toggle("oculto", !soyHost);
+    $("msgEspera").textContent = soyHost
+      ? "Cuando estén todos, pulsa iniciar (mínimo 2 jugadores)."
+      : "Esperando a que el anfitrión inicie la partida…";
+    return;
+  }
+
+  // Juego / terminado
+  $("marcador").innerHTML = e.jugadores.map((j) => chipJugador(j, e.turno)).join("");
+
+  const miTurno = e.fase === "jugando" && e.turno === miId;
+  $("tablero").innerHTML = e.cartas
+    .map((c, i) => {
+      const contenido = c.estado === "oculta" ? "" : c.flor;
+      return `<div class="carta ${c.estado}" data-i="${i}">${contenido}</div>`;
+    })
+    .join("");
+
+  document.querySelectorAll(".carta.oculta").forEach((el) => {
+    el.onclick = () => {
+      if (!miTurno) return mostrarMensaje("No es tu turno");
+      socket.emit("voltear", { indice: Number(el.dataset.i) }, (r) => {
+        if (!r.ok && r.error) mostrarMensaje(r.error);
+      });
+    };
+  });
+
+  if (e.fase === "jugando" && !msgTemporal) {
+    const quien = e.jugadores.find((j) => j.id === e.turno);
+    $("mensaje").textContent = miTurno ? "👉 ¡Es tu turno!" : `Turno de ${quien ? quien.nombre : "…"}`;
+  } else if (e.fase === "terminado" && !msgTemporal) {
+    $("mensaje").textContent = "";
+  }
+
+  $("fin").classList.toggle("oculto", e.fase !== "terminado");
+  $("btnReiniciar").classList.toggle("oculto", !soyHost);
+}
+} // fin iniciar()
+</script>
+</body>
+</html>
