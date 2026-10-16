@@ -3,7 +3,7 @@ const express = require("express"), http = require("http"), crypto = require("cr
 const { Server } = require("socket.io");
 const app = express(), server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
-app.use(express.static("public"));
+app.use(express.static("public", { dotfiles: "allow" })); // permite /.well-known/assetlinks.json
 
 const F = ["🌹","🌻","🌷","🌸","🌼","🌺","💐","🪻","🪷","🏵️","🌿","🍀","🌵","🌴","🌱","🍁","🍄","🌾"];
 const COL = ["#e0457b","#3a8fe0","#3aa76d","#e0a030","#8f5ae0","#e05a2a","#20b2aa","#a0522d","#d63fd6","#607d8b"];
@@ -153,6 +153,10 @@ io.on("connection", socket => {
       if (v >= 0 && v < 1e5 && v > x[f]) { x[f] = Math.floor(v); sucio = true; }
     }
     socket.emit("perfil", x);
+  });
+  socket.on("reaccion", e => {
+    const s = sala(), j = s && J(s, yo);
+    if (j && ["😂", "👏", "😱", "🔥"].includes(e)) io.to(s.codigo).emit("reaccion", { e, n: j.nombre });
   });
   socket.on("ranking", (_, cb = () => {}) => {
     const l = Object.entries(stats).filter(([, v]) => v.partidas > 0).map(([k, v]) => ({ k, ...v }))
