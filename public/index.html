@@ -35,15 +35,20 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
 .m{text-align:center;font-weight:700;min-height:1.5em;margin:10px 0;color:var(--c);letter-spacing:1px;text-shadow:0 0 8px rgba(0,229,255,.7)}.er{color:#ff7b9c;text-align:center;min-height:1.3em}
 #bw{height:8px;background:rgba(0,229,255,.12);border:1px solid var(--bo);border-radius:4px;margin-bottom:10px;overflow:hidden}#barra{height:100%;background:linear-gradient(90deg,#00e5ff,#ff2bd6);box-shadow:0 0 10px #00e5ff;width:0;transition:width .2s linear}
 #log{height:90px;overflow:auto;font:.82rem ui-monospace,Consolas,monospace;margin-bottom:6px;background:rgba(0,10,30,.55);border:1px solid var(--bo);border-radius:4px;padding:6px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);z-index:9;padding:10px 16px;background:#0a1230;border:1px solid var(--m);color:#fff;border-radius:6px;box-shadow:0 0 16px var(--m)}
+.fila{display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid var(--bo)}.fila.yo{background:rgba(0,229,255,.15)}
+#logros{display:grid;gap:4px;margin:10px 0}h3{color:var(--c);margin:12px 0 6px}
 </style></head><body><main>
 <h1>🌸 Flores Repetidas</h1>
 <section id="inicio" class="p">
  <div id="onl" class="c0" style="margin-bottom:10px">🟢 Conectando…</div>
+ <div id="miP" class="c0" style="margin-bottom:10px"></div>
  <input id="nombre" placeholder="Tu nombre" maxlength="16">
  <button id="bSolo" class="s">🎯 Entrenar solo</button>
  <button id="bLibre">Crear partida libre (2-4)</button>
  <button id="bTorneo">🏆 Crear torneo (hasta 10)</button>
  <button id="bBuscar">⚡ Buscar partida rápida (1 vs 1)</button><button id="bCancel" class="s oc">✖ Cancelar búsqueda</button>
+ <button id="bRank" class="s">🏆 Ranking y logros</button>
  <p class="c0">— o únete con un código —</p>
  <input id="cIn" placeholder="CÓDIGO" maxlength="4" style="text-transform:uppercase;text-align:center;letter-spacing:6px">
  <button id="bUnir" class="s">Unirse</button><div id="eI" class="er"></div>
@@ -54,6 +59,11 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
  <button id="bNueva">Nueva partida</button>
  <div id="sInfo" class="m"></div><div id="tabS"></div><div id="sRes" class="m"></div>
  <button id="bVolver1" class="s">Volver</button>
+</section>
+<section id="rank" class="p oc">
+ <h3 style="margin-top:0">Mi perfil</h3><div id="perf"></div><div id="logros"></div>
+ <h3>🏆 Top 20 jugadores</h3><div id="top"></div>
+ <button id="bVolver2" class="s" style="margin-top:10px">Volver</button>
 </section>
 <section id="espera" class="p oc">
  <p class="c0">Código de la sala:</p><div id="cSala" class="cod"></div>
@@ -76,7 +86,7 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
 const $=id=>document.getElementById(id),FL=["🌹","🌻","🌷","🌸","🌼","🌺","💐","🪻","🪷","🏵️","🌿","🍀","🌵","🌴","🌱","🍁","🍄","🌾"];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const mez=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
-const nom=()=>$("nombre").value.trim()||"Jugador",ver=id=>["inicio","solo","espera","juego"].forEach(x=>$(x).classList.toggle("oc",x!==id));
+const nom=()=>{const n=$("nombre").value.trim()||"Jugador";try{localStorage.setItem("fr-nombre",n)}catch(e){}return n},ver=id=>["inicio","solo","espera","juego","rank"].forEach(x=>$(x).classList.toggle("oc",x!==id));
 let ac;function son(t){try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain(),f={ok:[660,880],no:[220,160],fin:[523,784,1046]}[t];o.connect(g);g.connect(ac.destination);f.forEach((x,i)=>o.frequency.setValueAtTime(x,ac.currentTime+i*.12));g.gain.value=.08;o.start();o.stop(ac.currentTime+f.length*.12+.05)}catch(e){}}
 function tab(el,cs,tam,fn){
  if(el.dataset.n!=cs.length+"-"+tam){el.dataset.n=cs.length+"-"+tam;el.className="tab t"+tam;el.style.gridTemplateColumns=`repeat(${tam},1fr)`;
@@ -97,8 +107,23 @@ function clicS(i){if(S.bloq)return;if(!S.t0)S.t0=Date.now();S.cs[i].e="volteada"
 // ---------- ONLINE ----------
 const socket=io(),sv=()=>{try{return JSON.parse(localStorage.getItem("fr-sesion"))}catch(e){return null}};
 let E=null,miId=null,lim=0;
+const nmG=()=>{try{return localStorage.getItem("fr-nombre")||""}catch(e){return""}};$("nombre").value=nmG();
+const pid=(()=>{try{let p=localStorage.getItem("fr-pid");if(!p){p=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now());localStorage.setItem("fr-pid",p)}return p}catch(e){return"anon"+Math.random().toString(36).slice(2)}})();
+let PF=(()=>{try{return JSON.parse(localStorage.getItem("fr-perfil"))}catch(e){return null}})()||{copas:0,torneos:0,partidas:0,parejas:0};
+const LOG=[["🥇","Primera victoria",p=>p.copas>=1],["🎮","Constante: 10 partidas",p=>p.partidas>=10],["🏆","Diez copas",p=>p.copas>=10],["👑","Campeón de torneo",p=>p.torneos>=1],["🌸","Coleccionista: 100 parejas",p=>p.parejas>=100],["🛡️","Veterano: 50 partidas",p=>p.partidas>=50],["💎","Leyenda: 50 copas",p=>p.copas>=50]];
+const toast=t=>{const d=document.createElement("div");d.className="toast";d.textContent=t;d.style.top=(14+document.querySelectorAll(".toast").length*46)+"px";document.body.appendChild(d);setTimeout(()=>d.remove(),4500)};
+const resumen=()=>{$("miP").textContent=`🏆 ${PF.copas} copas · 👑 ${PF.torneos} torneos · 🎮 ${PF.partidas} partidas`};resumen();
+socket.on("perfil",x=>{const antes=LOG.filter(l=>l[2](PF)).map(l=>l[1]);PF={copas:x.copas,torneos:x.torneos,partidas:x.partidas,parejas:x.parejas};
+ try{localStorage.setItem("fr-perfil",JSON.stringify(PF))}catch(e){}resumen();
+ LOG.filter(l=>l[2](PF)&&!antes.includes(l[1])).forEach(l=>toast(`${l[0]} Logro desbloqueado: ${l[1]}`))});
+function verRank(){
+ $("perf").innerHTML=`<div class="c0">🏆 <b>${PF.copas}</b> copas · 👑 <b>${PF.torneos}</b> torneos · 🎮 ${PF.partidas} partidas · 🌸 ${PF.parejas} parejas</div>`;
+ $("logros").innerHTML=LOG.map(l=>{const ok=l[2](PF);return `<div style="opacity:${ok?1:.4}">${ok?l[0]:"🔒"} ${l[1]}</div>`}).join("");
+ $("top").textContent="Cargando…";
+ socket.emit("ranking",null,r=>{$("top").innerHTML=r.top.length?r.top.map((x,i)=>`<div class="fila${x.yo?" yo":""}"><span>${["🥇","🥈","🥉"][i]||(i+1)+"."} ${esc(x.n)}</span><span>🏆${x.c} · 👑${x.t}</span></div>`).join("")+(r.pos>20?`<div class="c0">Tu posición: #${r.pos} de ${r.total}</div>`:""):"Aún no hay partidas jugadas."})}
+$("bRank").onclick=()=>{ver("rank");verRank()};$("bVolver2").onclick=()=>ver("inicio");
 const guardar=(c,t)=>{miId=t;try{localStorage.setItem("fr-sesion",JSON.stringify({codigo:c,token:t}))}catch(e){}};
-socket.on("connect",()=>{const s=sv();if(s)socket.emit("reconectar",s,r=>{if(r.ok)miId=s.token;else try{localStorage.removeItem("fr-sesion")}catch(e){}})});
+socket.on("connect",()=>{socket.emit("perfil",{pid,nombre:nmG(),stats:PF});const s=sv();if(s)socket.emit("reconectar",s,r=>{if(r.ok)miId=s.token;else try{localStorage.removeItem("fr-sesion")}catch(e){}})});
 const crear=modo=>socket.emit("crearSala",{nombre:nom(),modo,tam:4},r=>{if(r.ok)guardar(r.codigo,r.token)});
 $("bLibre").onclick=()=>crear("libre");$("bTorneo").onclick=()=>crear("torneo");
 const busc=on=>{$("bBuscar").classList.toggle("oc",on);$("bCancel").classList.toggle("oc",!on);$("eI").textContent=on?"🔎 Buscando rival… (no cierres la página)":""};
