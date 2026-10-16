@@ -38,6 +38,7 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
 </style></head><body><main>
 <h1>🌸 Flores Repetidas</h1>
 <section id="inicio" class="p">
+ <div id="onl" class="c0" style="margin-bottom:10px">🟢 Conectando…</div>
  <input id="nombre" placeholder="Tu nombre" maxlength="16">
  <button id="bSolo" class="s">🎯 Entrenar solo</button>
  <button id="bLibre">Crear partida libre (2-4)</button>
@@ -112,6 +113,7 @@ const salir=()=>{if(E&&(E.fase==="jugando"||E.fase==="pausa")&&E.juegan.includes
 $("bSalir").onclick=$("bSalirE").onclick=salir;
 socket.on("chat",m=>{$("log").insertAdjacentHTML("beforeend",`<div><b style="color:${m.c}">${esc(m.n)}:</b> ${esc(m.t)}</div>`);$("log").scrollTop=1e9});
 socket.on("sonido",son);
+socket.on("online",o=>{$("onl").textContent=`🟢 ${o.n} conectado${o.n===1?"":"s"}`+(o.b?` · ⚡ ${o.b} buscando partida`:"")});
 socket.on("estado",e=>{if(!miId)return;E=e;lim=Date.now()+e.rest;pintar()});
 const chip=(j,e)=>`<div class="j ${j.id===e.turno&&e.fase==="jugando"?"t":""} ${j.elim?"x":""}" style="border-color:${j.color}"><b style="color:${j.color}">${esc(j.nombre)}${j.id===miId?" (tú)":""}</b>${j.conectado?"":" ⚠️"}<br>🏆${j.victorias}${e.juegan.includes(j.id)?" · 🌸"+j.puntos:""}</div>`;
 function pintar(){const e=E,soyH=e.host===miId;
