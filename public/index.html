@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>🌸 Flores Repetidas</title>
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#070b1f"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
 <style>
 :root{--c:#00e5ff;--m:#ff2bd6;--tx:#e6f7ff;--su:#7fa3b8;--bo:rgba(0,229,255,.4);--pn:rgba(8,14,34,.74)}
 *{box-sizing:border-box}
@@ -38,6 +39,8 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);z-index:9;padding:10px 16px;background:#0a1230;border:1px solid var(--m);color:#fff;border-radius:6px;box-shadow:0 0 16px var(--m)}
 .fila{display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid var(--bo)}.fila.yo{background:rgba(0,229,255,.15)}
 #logros{display:grid;gap:4px;margin:10px 0}h3{color:var(--c);margin:12px 0 6px}
+.cf{position:fixed;top:-30px;font-size:1.6rem;z-index:8;pointer-events:none;animation:cae 3.5s linear forwards}@keyframes cae{to{transform:translateY(110vh) rotate(360deg)}}
+.rxf{top:auto;bottom:90px;font-size:1.3rem;color:#fff;text-shadow:0 0 8px #00e5ff;animation:sub 2.2s ease-out forwards}@keyframes sub{to{transform:translateY(-220px);opacity:0}}
 </style></head><body><main>
 <h1>🌸 Flores Repetidas</h1>
 <section id="inicio" class="p">
@@ -52,8 +55,10 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
  <p class="c0">— o únete con un código —</p>
  <input id="cIn" placeholder="CÓDIGO" maxlength="4" style="text-transform:uppercase;text-align:center;letter-spacing:6px">
  <button id="bUnir" class="s">Unirse</button><div id="eI" class="er"></div>
+ <p class="c0" style="font-size:.8rem;margin:0"><a href="/privacy.html" style="color:var(--su)">Política de privacidad</a></p>
 </section>
 <section id="solo" class="p oc">
+ <select id="sBot"><option value="0">Entrenar (sin rival)</option><option value="0.4">Contra la PC: fácil</option><option value="0.7">Contra la PC: medio</option><option value="0.95">Contra la PC: difícil</option></select>
  <select id="sTam"><option value="4">Tablero 4x4</option><option value="6">Tablero 6x6</option></select>
  <select id="sDif"><option value="1500">Fácil (cartas visibles 1.5s)</option><option value="700">Difícil (0.7s)</option></select>
  <button id="bNueva">Nueva partida</button>
@@ -71,23 +76,25 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
  <div id="cfg"><select id="cModo"><option value="libre">Partida libre (2-4)</option><option value="torneo">Torneo eliminatorio (2-10)</option></select>
  <select id="cTam"><option value="4">Tablero 4x4</option><option value="6">Tablero 6x6</option></select>
  <button id="bIni">Iniciar</button></div>
- <button id="bSalirE" class="s">⬅ Salir de la sala</button><p id="mE" class="c0"></p><div id="eE" class="er"></div>
+ <button id="bCopiar" class="s">📋 Copiar enlace de invitación</button><button id="bSalirE" class="s">⬅ Salir de la sala</button><p id="mE" class="c0"></p><div id="eE" class="er"></div>
 </section>
 <section id="juego" class="oc">
  <div id="hd" class="c0"></div><div id="mar" class="js"></div>
  <div id="bw"><div id="barra"></div></div>
  <div id="tab"></div><div id="msg" class="m"></div>
  <div id="fin" class="oc"><button id="bOtra">Jugar otra vez</button></div>
+ <div style="display:flex;gap:6px;margin:8px 0"><button class="s rx">😂</button><button class="s rx">👏</button><button class="s rx">😱</button><button class="s rx">🔥</button></div>
  <button id="bSalir" class="s">⬅ Salir de la partida</button>
  <div class="p" style="margin-top:10px"><div id="log"></div><input id="ch" placeholder="Escribe y pulsa Enter" maxlength="120" style="margin:0"></div>
 </section></main>
+<button id="bMute" class="s" style="position:fixed;top:10px;right:10px;width:auto;padding:6px 10px;z-index:9;clip-path:none;margin:0">🔊</button>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const $=id=>document.getElementById(id),FL=["🌹","🌻","🌷","🌸","🌼","🌺","💐","🪻","🪷","🏵️","🌿","🍀","🌵","🌴","🌱","🍁","🍄","🌾"];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const mez=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const nom=()=>{const n=$("nombre").value.trim()||"Jugador";try{localStorage.setItem("fr-nombre",n)}catch(e){}return n},ver=id=>["inicio","solo","espera","juego","rank"].forEach(x=>$(x).classList.toggle("oc",x!==id));
-let ac;function son(t){try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain(),f={ok:[660,880],no:[220,160],fin:[523,784,1046]}[t];o.connect(g);g.connect(ac.destination);f.forEach((x,i)=>o.frequency.setValueAtTime(x,ac.currentTime+i*.12));g.gain.value=.08;o.start();o.stop(ac.currentTime+f.length*.12+.05)}catch(e){}}
+let ac,MUTE=false;function son(t){if(MUTE)return;try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain(),f={ok:[660,880],no:[220,160],fin:[523,784,1046]}[t];o.connect(g);g.connect(ac.destination);f.forEach((x,i)=>o.frequency.setValueAtTime(x,ac.currentTime+i*.12));g.gain.value=.08;o.start();o.stop(ac.currentTime+f.length*.12+.05)}catch(e){}}
 function tab(el,cs,tam,fn){
  if(el.dataset.n!=cs.length+"-"+tam){el.dataset.n=cs.length+"-"+tam;el.className="tab t"+tam;el.style.gridTemplateColumns=`repeat(${tam},1fr)`;
   el.innerHTML=cs.map(()=>'<div class="c"><div class="in"><div class="f b"></div><div class="f a"></div></div></div>').join("")}
@@ -96,16 +103,28 @@ function tab(el,cs,tam,fn){
 let S;const rk=()=>"fr-"+S.tam+"-"+S.ms,mejor=()=>{try{return localStorage.getItem(rk())}catch(e){return null}};
 $("bSolo").onclick=()=>{ver("solo");nueva()};$("bVolver1").onclick=()=>ver("inicio");$("bNueva").onclick=nueva;
 function nueva(){const tam=+$("sTam").value,fl=mez([...FL]).slice(0,tam*tam/2);
- S={tam,ms:+$("sDif").value,cs:mez([...fl,...fl]).map(f=>({f,e:"oculta"})),vol:[],bloq:false,mov:0,par:0,t0:0};$("sRes").textContent="";pS()}
-function pS(){tab($("tabS"),S.cs,S.tam,clicS);$("sInfo").textContent=`Movimientos: ${S.mov} · Parejas: ${S.par}/${S.cs.length/2}`+(mejor()?` · Récord: ${mejor()}`:"")}
-function clicS(i){if(S.bloq)return;if(!S.t0)S.t0=Date.now();S.cs[i].e="volteada";S.vol.push(i);if(S.vol.length<2)return pS();
+ S={tam,ms:+$("sDif").value,bot:+$("sBot").value,tn:0,pts:[0,0],mem:{},cs:mez([...fl,...fl]).map(f=>({f,e:"oculta"})),vol:[],bloq:false,mov:0,par:0,t0:0};$("sRes").textContent="";pS()}
+function pS(){tab($("tabS"),S.cs,S.tam,clicS);$("sInfo").textContent=S.bot?`Tú ${S.pts[0]} – PC ${S.pts[1]} · Turno: ${S.tn?"🤖 PC":"👉 Tú"}`:`Movimientos: ${S.mov} · Parejas: ${S.par}/${S.cs.length/2}`+(mejor()?` · Récord: ${mejor()}`:"")}
+function clicS(i){if(S.bloq||S.tn)return;jugS(i)}
+function jugS(i){if(!S.t0)S.t0=Date.now();const c=S.cs[i];c.e="volteada";S.mem[i]=c.f;S.vol.push(i);if(S.vol.length<2)return pS();
  S.mov++;const[a,b]=S.vol;S.vol=[];
- if(S.cs[a].f===S.cs[b].f){S.cs[a].e=S.cs[b].e="emparejada";S.par++;son("ok");pS();
-  if(S.par*2===S.cs.length){son("fin");let ex="";try{const r=mejor();if(!r||S.mov<+r){localStorage.setItem(rk(),S.mov);ex=" · ¡Nuevo récord!"}}catch(e){}
-   $("sRes").textContent=`🏆 ¡Listo! ${S.mov} movimientos en ${Math.round((Date.now()-S.t0)/1000)}s`+ex}}
- else{S.bloq=true;son("no");pS();setTimeout(()=>{S.cs[a].e=S.cs[b].e="oculta";S.bloq=false;pS()},S.ms)}}
+ if(S.cs[a].f===S.cs[b].f){S.cs[a].e=S.cs[b].e="emparejada";S.pts[S.tn]++;S.par++;delete S.mem[a];delete S.mem[b];son("ok");pS();
+  if(S.par*2===S.cs.length)return finS();if(S.tn)setTimeout(botS,800)}
+ else{S.bloq=true;son("no");pS();setTimeout(()=>{S.cs[a].e=S.cs[b].e="oculta";S.bloq=false;if(S.bot)S.tn=1-S.tn;pS();if(S.tn)setTimeout(botS,600)},S.ms)}}
+function botS(){if(S.tn!==1||S.bloq)return;const h=S.cs.map((c,i)=>i).filter(i=>S.cs[i].e==="oculta");
+ if(!S.vol.length){const m=Object.keys(S.mem).map(Number).filter(i=>S.cs[i].e==="oculta");let k=null;
+  for(const x of m)for(const y of m)if(x<y&&S.mem[x]===S.mem[y]&&Math.random()<S.bot)k=x;
+  if(k===null){const u=h.filter(i=>!(i in S.mem)),z=u.length?u:h;k=z[Math.random()*z.length|0]}
+  jugS(k);setTimeout(botS,900)}
+ else{const f=S.cs[S.vol[0]].f,pr=Object.keys(S.mem).map(Number).find(i=>i!==S.vol[0]&&S.cs[i].e==="oculta"&&S.mem[i]===f);let k=pr!==undefined&&Math.random()<S.bot?pr:null;
+  if(k===null){const u=h.filter(i=>i!==S.vol[0]&&!(i in S.mem)),z=u.length?u:h.filter(i=>i!==S.vol[0]);k=z[Math.random()*z.length|0]}
+  jugS(k)}}
+function finS(){son("fin");
+ if(S.bot){const[a,b]=S.pts;if(a>b)confeti();$("sRes").textContent=a>b?`🏆 ¡Ganaste ${a}–${b}!`:a<b?`🤖 Ganó la PC ${b}–${a}`:`🤝 Empate ${a}–${b}`;return}
+ let ex="";try{const r=mejor();if(!r||S.mov<+r){localStorage.setItem(rk(),S.mov);ex=" · ¡Nuevo récord!"}}catch(e){}
+ confeti();$("sRes").textContent=`🏆 ¡Listo! ${S.mov} movimientos en ${Math.round((Date.now()-S.t0)/1000)}s`+ex}
 // ---------- ONLINE ----------
-const socket=io(),sv=()=>{try{return JSON.parse(localStorage.getItem("fr-sesion"))}catch(e){return null}};
+const socket=typeof io!=="undefined"?io():{on(){},emit(){}},sv=()=>{try{return JSON.parse(localStorage.getItem("fr-sesion"))}catch(e){return null}};
 let E=null,miId=null,lim=0;
 const nmG=()=>{try{return localStorage.getItem("fr-nombre")||""}catch(e){return""}};$("nombre").value=nmG();
 const pid=(()=>{try{let p=localStorage.getItem("fr-pid");if(!p){p=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now());localStorage.setItem("fr-pid",p)}return p}catch(e){return"anon"+Math.random().toString(36).slice(2)}})();
@@ -136,10 +155,16 @@ $("ch").onkeydown=e=>{if(e.key==="Enter"&&e.target.value.trim()){socket.emit("ch
 const salir=()=>{if(E&&(E.fase==="jugando"||E.fase==="pausa")&&E.juegan.includes(miId)&&!confirm("¿Salir de la partida? Tu rival ganará."))return;
  socket.emit("salir");try{localStorage.removeItem("fr-sesion")}catch(e){}E=null;miId=null;$("log").innerHTML="";$("eE").textContent="";ver("inicio")};
 $("bSalir").onclick=$("bSalirE").onclick=salir;
+const confeti=()=>{for(let i=0;i<40;i++){const d=document.createElement("div");d.className="cf";d.textContent=["🌸","🌼","✨","🌺","🎉"][i%5];d.style.left=Math.random()*100+"vw";d.style.animationDelay=Math.random()*1.5+"s";document.body.appendChild(d);setTimeout(()=>d.remove(),5000)}};
+document.querySelectorAll(".rx").forEach(b=>b.onclick=()=>socket.emit("reaccion",b.textContent));
+socket.on("reaccion",m=>{const d=document.createElement("div");d.className="cf rxf";d.textContent=m.e+" "+m.n;d.style.left=(10+Math.random()*70)+"vw";document.body.appendChild(d);setTimeout(()=>d.remove(),2500)});
+$("bCopiar").onclick=()=>{try{navigator.clipboard.writeText(location.origin+"/?sala="+E.codigo).then(()=>toast("📋 Enlace copiado"))}catch(e){toast("Código: "+E.codigo)}};
+$("bMute").onclick=()=>{MUTE=!MUTE;$("bMute").textContent=MUTE?"🔇":"🔊"};
+const ps=new URLSearchParams(location.search).get("sala");if(ps)$("cIn").value=ps.toUpperCase().slice(0,4);
 socket.on("chat",m=>{$("log").insertAdjacentHTML("beforeend",`<div><b style="color:${m.c}">${esc(m.n)}:</b> ${esc(m.t)}</div>`);$("log").scrollTop=1e9});
 socket.on("sonido",son);
 socket.on("online",o=>{$("onl").textContent=`🟢 ${o.n} conectado${o.n===1?"":"s"}`+(o.b?` · ⚡ ${o.b} buscando partida`:"")});
-socket.on("estado",e=>{if(!miId)return;E=e;lim=Date.now()+e.rest;pintar()});
+socket.on("estado",e=>{if(!miId)return;if(e.fase==="fin"&&(!E||E.fase!=="fin"))confeti();E=e;lim=Date.now()+e.rest;pintar()});
 const chip=(j,e)=>`<div class="j ${j.id===e.turno&&e.fase==="jugando"?"t":""} ${j.elim?"x":""}" style="border-color:${j.color}"><b style="color:${j.color}">${esc(j.nombre)}${j.id===miId?" (tú)":""}</b>${j.conectado?"":" ⚠️"}<br>🏆${j.victorias}${e.juegan.includes(j.id)?" · 🌸"+j.puntos:""}</div>`;
 function pintar(){const e=E,soyH=e.host===miId;
  if(e.fase==="espera"){ver("espera");$("cSala").textContent=e.codigo;$("lE").innerHTML=e.jugadores.map(j=>chip(j,e)).join("");
@@ -152,4 +177,5 @@ function pintar(){const e=E,soyH=e.host===miId;
  $("msg").textContent=e.aviso||(e.fase==="jugando"?(mi?"👉 ¡Es tu turno!":e.juegan.includes(miId)||e.modo==="libre"?`Turno de ${q?q.nombre:"…"}`:`👀 Mirando · turno de ${q?q.nombre:"…"}`):"");
  $("fin").classList.toggle("oc",!(e.fase==="fin"&&soyH))}
 setInterval(()=>{$("barra").style.width=E&&E.fase==="jugando"?Math.max(0,(lim-Date.now())/200)+"%":"0"},200);
+if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
 </script></body></html>
