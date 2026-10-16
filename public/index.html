@@ -2,24 +2,39 @@
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>🌸 Flores Repetidas</title>
 <style>
-:root{--bg:#fff5f8;--card:#fff;--tx:#3b2a33;--su:#8a7580;--ro:#e0457b;--rc:#fde3ec;--bo:#f0d4de}
-@media(prefers-color-scheme:dark){:root{--bg:#1c1419;--card:#2a1e25;--tx:#f5e8ee;--su:#b79ba8;--ro:#ff6b9d;--rc:#3d2631;--bo:#4a3340}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,sans-serif;display:flex;justify-content:center;padding:14px}
-main{width:100%;max-width:520px}h1{text-align:center;margin:6px 0 12px}
-.p{background:var(--card);border:1px solid var(--bo);border-radius:16px;padding:16px;margin-bottom:12px}
-input,select{width:100%;padding:11px;font-size:1rem;border-radius:10px;border:1px solid var(--bo);background:var(--bg);color:var(--tx);margin-bottom:8px}
-button{width:100%;padding:11px;font-size:1rem;border:0;border-radius:10px;background:var(--ro);color:#fff;font-weight:600;cursor:pointer;margin-bottom:8px}
-button.s{background:var(--rc);color:var(--ro)}.oc{display:none!important}.c0{text-align:center;color:var(--su)}
-.cod{font-size:2.2rem;letter-spacing:8px;text-align:center;font-weight:800;color:var(--ro)}
+:root{--c:#00e5ff;--m:#ff2bd6;--tx:#e6f7ff;--su:#7fa3b8;--bo:rgba(0,229,255,.4);--pn:rgba(8,14,34,.74)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:var(--tx);font-family:"Segoe UI",system-ui,sans-serif;display:flex;justify-content:center;padding:14px;background:radial-gradient(ellipse at 50% 0%,#14235a 0%,#070b1f 60%,#03050f 100%) fixed}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(0,229,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.07) 1px,transparent 1px);background-size:36px 36px;animation:mv 14s linear infinite}
+@keyframes mv{to{background-position:0 36px,36px 0}}
+main{width:100%;max-width:520px;position:relative;z-index:1}
+h1{text-align:center;margin:6px 0 14px;font-size:1.6rem;text-transform:uppercase;letter-spacing:4px;font-weight:800;color:var(--c);text-shadow:0 0 8px var(--c),0 0 26px rgba(0,229,255,.6)}
+.p{background:var(--pn);border:1px solid var(--bo);border-radius:6px;padding:16px;margin-bottom:12px;box-shadow:0 0 18px rgba(0,229,255,.15),inset 0 0 24px rgba(0,229,255,.05);backdrop-filter:blur(6px)}
+input,select{width:100%;padding:11px;font:inherit;font-size:1rem;border-radius:4px;border:1px solid var(--bo);background:rgba(0,10,30,.65);color:var(--tx);margin-bottom:8px;outline:0}
+input:focus,select:focus{border-color:var(--c);box-shadow:0 0 12px rgba(0,229,255,.5)}
+input::placeholder{color:var(--su)}option{color:#111}
+button{width:100%;padding:12px;font:inherit;font-size:.9rem;border:1px solid var(--c);background:linear-gradient(90deg,rgba(0,229,255,.22),rgba(255,43,214,.22));color:#fff;font-weight:700;text-transform:uppercase;letter-spacing:2px;cursor:pointer;margin-bottom:10px;text-shadow:0 0 8px var(--c);clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);transition:filter .15s,transform .1s}
+button:hover{filter:brightness(1.5)}button:active{transform:scale(.98)}
+button.s{background:transparent;border-color:var(--bo);color:var(--c)}
+.oc{display:none!important}.c0{text-align:center;color:var(--su)}
+.cod{font:700 2.4rem ui-monospace,Consolas,monospace;letter-spacing:10px;text-align:center;color:var(--m);text-shadow:0 0 10px var(--m),0 0 28px rgba(255,43,214,.6)}
 .js{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-.j{flex:1 1 30%;padding:6px 10px;border-radius:12px;border:2px solid var(--bo);background:var(--card);font-size:.85rem}
-.j.t{background:var(--rc);box-shadow:0 0 0 2px var(--ro)}.j.x{opacity:.45;text-decoration:line-through}
-.tab{display:grid;gap:6px}.c{aspect-ratio:1;border-radius:12px;border:2px solid var(--bo);display:flex;align-items:center;justify-content:center;background:var(--ro);cursor:pointer;user-select:none}
-.t4 .c{font-size:clamp(1.6rem,10vw,2.8rem)}.t6 .c{font-size:clamp(1rem,6.5vw,1.8rem)}
-.c.oculta::after{content:"🌿"}.c.volteada{background:var(--card)}.c.emparejada{background:var(--rc);cursor:default}
-#bw{height:6px;background:var(--bo);border-radius:4px;margin-bottom:8px}#barra{height:100%;background:var(--ro);border-radius:4px;width:0}
-.m{text-align:center;font-weight:600;min-height:1.5em;margin:8px 0}.er{color:#d33;text-align:center;min-height:1.3em}
-#log{height:90px;overflow:auto;font-size:.85rem;margin-bottom:6px}
+.j{flex:1 1 30%;padding:6px 10px;border-radius:4px;border:2px solid var(--bo);background:rgba(0,10,30,.65);font-size:.82rem}
+.j.t{box-shadow:0 0 16px var(--c),inset 0 0 12px rgba(0,229,255,.25)}.j.x{opacity:.35;text-decoration:line-through}
+.tab{display:grid;gap:8px;padding:14px;border-radius:6px;background:rgba(0,10,30,.55);border:1px solid var(--c);box-shadow:0 0 22px rgba(0,229,255,.35),inset 0 0 30px rgba(0,229,255,.08)}
+.c{aspect-ratio:4/5;perspective:700px;cursor:pointer;user-select:none}
+.in{position:relative;width:100%;height:100%;transition:transform .55s cubic-bezier(.4,.2,.2,1);transform-style:preserve-3d}
+.c.volteada .in,.c.emparejada .in{transform:rotateY(180deg)}
+.c.oculta:hover .in{transform:translateY(-3px)}.c.emparejada{cursor:default}
+.f{position:absolute;inset:0;border-radius:6px;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;align-items:center;justify-content:center}
+.b{background:radial-gradient(circle,#00e5ff 0 4%,rgba(0,229,255,.25) 5% 12%,transparent 13%),repeating-linear-gradient(60deg,rgba(0,229,255,.2) 0 1px,transparent 1px 10px),repeating-linear-gradient(-60deg,rgba(255,43,214,.17) 0 1px,transparent 1px 10px),linear-gradient(135deg,#0b1a4a,#1a0b3a);border:1px solid var(--c);box-shadow:0 0 10px rgba(0,229,255,.5),inset 0 0 12px rgba(0,229,255,.3)}
+.a{transform:rotateY(180deg);background:radial-gradient(circle at 50% 40%,#16356b,#070b1f);border:1px solid var(--m);box-shadow:0 0 12px rgba(255,43,214,.55)}
+.a{filter:drop-shadow(0 0 5px rgba(0,229,255,.6))}
+.c.emparejada .a{border-color:#39ff88;background:radial-gradient(circle at 50% 40%,#0f5a3a,#06201a);box-shadow:0 0 16px 2px rgba(57,255,136,.8)}
+.t4 .a{font-size:clamp(1.8rem,10vw,3rem)}.t6 .a{font-size:clamp(1.1rem,6vw,1.9rem)}
+.m{text-align:center;font-weight:700;min-height:1.5em;margin:10px 0;color:var(--c);letter-spacing:1px;text-shadow:0 0 8px rgba(0,229,255,.7)}.er{color:#ff7b9c;text-align:center;min-height:1.3em}
+#bw{height:8px;background:rgba(0,229,255,.12);border:1px solid var(--bo);border-radius:4px;margin-bottom:10px;overflow:hidden}#barra{height:100%;background:linear-gradient(90deg,#00e5ff,#ff2bd6);box-shadow:0 0 10px #00e5ff;width:0;transition:width .2s linear}
+#log{height:90px;overflow:auto;font:.82rem ui-monospace,Consolas,monospace;margin-bottom:6px;background:rgba(0,10,30,.55);border:1px solid var(--bo);border-radius:4px;padding:6px}
 </style></head><body><main>
 <h1>🌸 Flores Repetidas</h1>
 <section id="inicio" class="p">
@@ -61,9 +76,10 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"
 const mez=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const nom=()=>$("nombre").value.trim()||"Jugador",ver=id=>["inicio","solo","espera","juego"].forEach(x=>$(x).classList.toggle("oc",x!==id));
 let ac;function son(t){try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain(),f={ok:[660,880],no:[220,160],fin:[523,784,1046]}[t];o.connect(g);g.connect(ac.destination);f.forEach((x,i)=>o.frequency.setValueAtTime(x,ac.currentTime+i*.12));g.gain.value=.08;o.start();o.stop(ac.currentTime+f.length*.12+.05)}catch(e){}}
-function tab(el,cs,tam,fn){el.className="tab t"+tam;el.style.gridTemplateColumns=`repeat(${tam},1fr)`;
- el.innerHTML=cs.map((c,i)=>`<div class="c ${c.e}" data-i="${i}">${c.f||""}</div>`).join("");
- el.querySelectorAll(".oculta").forEach(d=>d.onclick=()=>fn(+d.dataset.i))}
+function tab(el,cs,tam,fn){
+ if(el.dataset.n!=cs.length+"-"+tam){el.dataset.n=cs.length+"-"+tam;el.className="tab t"+tam;el.style.gridTemplateColumns=`repeat(${tam},1fr)`;
+  el.innerHTML=cs.map(()=>'<div class="c"><div class="in"><div class="f b"></div><div class="f a"></div></div></div>').join("")}
+ [...el.children].forEach((d,i)=>{const c=cs[i];d.className="c "+c.e;if(c.f)d.querySelector(".a").textContent=c.f;d.onclick=c.e==="oculta"?()=>fn(i):null})}
 // ---------- SOLO ----------
 let S;const rk=()=>"fr-"+S.tam+"-"+S.ms,mejor=()=>{try{return localStorage.getItem(rk())}catch(e){return null}};
 $("bSolo").onclick=()=>{ver("solo");nueva()};$("bVolver1").onclick=()=>ver("inicio");$("bNueva").onclick=nueva;
