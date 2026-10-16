@@ -19,6 +19,7 @@ const fs = require("fs"), ARCH = process.env.DATOS || "datos.json";
 let stats = {}, sucio = false;
 try { stats = JSON.parse(fs.readFileSync(ARCH, "utf8")); } catch (e) {}
 setInterval(() => { if (sucio) { sucio = false; try { fs.writeFileSync(ARCH, JSON.stringify(stats)); } catch (e) {} } }, 10000);
+const AVS = new Set(["🌸","🐝","🐞","🦋","🦊","🐢","🧚","🦉","🦚","🐉","🦄","🧙","🔥"]);
 const st = (k, n) => stats[k] = stats[k] || { nombre: n || "Jugador", copas: 0, torneos: 0, partidas: 0, parejas: 0 };
 function reg(j, d) {
   if (!j || !j.pid) return;
@@ -33,7 +34,7 @@ function pub(s) {
   return {
     codigo: s.codigo, host: s.host, modo: s.modo, tam: s.tam, fase: s.fase, ronda: s.ronda ? s.ronda.num : 0,
     campeon: s.campeon || null, aviso: s.aviso || "",
-    jugadores: s.jugadores.map(j => ({ id: j.id, nombre: j.nombre, color: j.color, victorias: j.victorias, puntos: j.puntos, conectado: j.conectado, elim: !!j.elim })),
+    jugadores: s.jugadores.map(j => ({ id: j.id, av: j.av, nombre: j.nombre, color: j.color, victorias: j.victorias, puntos: j.puntos, conectado: j.conectado, elim: !!j.elim })),
     juegan: p ? p.ids : [], turno: p ? p.ids[p.turno] : null, rest: p ? Math.max(0, p.limite - Date.now()) : 0,
     cartas: p ? p.cartas.map(c => ({ e: c.e, f: c.e === "oculta" ? null : c.f })) : []
   };
@@ -83,7 +84,7 @@ io.on("connection", socket => {
   const sala = () => salas[cs];
   const entrar = (s, j) => { cs = s.codigo; yo = j.id; j.sid = socket.id; j.conectado = true; socket.join(s.codigo); clearTimeout(s.lim); };
   const nuevo = (s, id, nombre) => {
-    const j = { id, pid: socket.data.pid, nombre: String(nombre || "").trim().slice(0, 16) || "Jugador", victorias: 0, puntos: 0, conectado: true,
+    const j = { id, pid: socket.data.pid, av: socket.data.av || "🌸", nombre: String(nombre || "").trim().slice(0, 16) || "Jugador", victorias: 0, puntos: 0, conectado: true,
       color: COL.find(c => !s.jugadores.some(x => x.color === c)) || COL[0] };
     s.jugadores.push(j); return j;
   };
@@ -143,7 +144,7 @@ io.on("connection", socket => {
     const s = sala(), j = s && J(s, yo);
     if (j) io.to(s.codigo).emit("chat", { n: j.nombre, c: j.color, t: String(t).slice(0, 120) });
   });
-  socket.on("perfil", ({ pid, nombre, stats: c } = {}) => {
+  socket.on("perfil", ({ pid, nombre, stats: c, av } = {}) => {
     const k = "p_" + String(pid || "").replace(/[^\w-]/g, "").slice(0, 48);
     if (k === "p_") return;
     socket.data.pid = k;
@@ -151,6 +152,11 @@ io.on("connection", socket => {
     for (const f of ["copas", "torneos", "partidas", "parejas"]) {
       const v = Number(c && c[f]);
       if (v >= 0 && v < 1e5 && v > x[f]) { x[f] = Math.floor(v); sucio = true; }
+    }
+    if (AVS.has(av)) {
+      socket.data.av = av; x.av = av; sucio = true;
+      const s = sala(), j = s && J(s, yo);
+      if (j) { j.av = av; emit(s); }
     }
     socket.emit("perfil", x);
   });
@@ -162,7 +168,7 @@ io.on("connection", socket => {
     const l = Object.entries(stats).filter(([, v]) => v.partidas > 0).map(([k, v]) => ({ k, ...v }))
       .sort((a, b) => b.copas - a.copas || b.torneos - a.torneos || a.partidas - b.partidas);
     const i = l.findIndex(x => x.k === socket.data.pid);
-    cb({ top: l.slice(0, 20).map(x => ({ n: x.nombre, c: x.copas, t: x.torneos, p: x.partidas, yo: x.k === socket.data.pid })), pos: i + 1, total: l.length });
+    cb({ top: l.slice(0, 20).map(x => ({ a: x.av, n: x.nombre, c: x.copas, t: x.torneos, p: x.partidas, yo: x.k === socket.data.pid })), pos: i + 1, total: l.length });
   });
   socket.on("salir", () => {
     const s = sala(), j = s && J(s, yo);
@@ -202,7 +208,7 @@ io.on("connection", socket => {
     const [a, b] = cola.splice(0, 2), c = cod();
     const s = salas[c] = { codigo: c, host: null, modo: "libre", tam: 4, fase: "espera", auto: true, jugadores: [] };
     [a, b].forEach(x => {
-      const id = crypto.randomUUID(), j = nuevo(s, id, x.nombre); j.conectado = false; j.pid = x.socket.data.pid;
+      const id = crypto.randomUUID(), j = nuevo(s, id, x.nombre); j.conectado = false; j.pid = x.socket.data.pid; j.av = x.socket.data.av || "🌸";
       if (!s.host) s.host = id;
       x.socket.emit("emparejado", { codigo: c, token: id });
     });
