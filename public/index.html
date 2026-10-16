@@ -27,6 +27,7 @@ button.s{background:var(--rc);color:var(--ro)}.oc{display:none!important}.c0{tex
  <button id="bSolo" class="s">🎯 Entrenar solo</button>
  <button id="bLibre">Crear partida libre (2-4)</button>
  <button id="bTorneo">🏆 Crear torneo (hasta 10)</button>
+ <button id="bBuscar">⚡ Buscar partida rápida (1 vs 1)</button><button id="bCancel" class="s oc">✖ Cancelar búsqueda</button>
  <p class="c0">— o únete con un código —</p>
  <input id="cIn" placeholder="CÓDIGO" maxlength="4" style="text-transform:uppercase;text-align:center;letter-spacing:6px">
  <button id="bUnir" class="s">Unirse</button><div id="eI" class="er"></div>
@@ -82,6 +83,9 @@ const guardar=(c,t)=>{miId=t;try{localStorage.setItem("fr-sesion",JSON.stringify
 socket.on("connect",()=>{const s=sv();if(s)socket.emit("reconectar",s,r=>{if(r.ok)miId=s.token;else try{localStorage.removeItem("fr-sesion")}catch(e){}})});
 const crear=modo=>socket.emit("crearSala",{nombre:nom(),modo,tam:4},r=>{if(r.ok)guardar(r.codigo,r.token)});
 $("bLibre").onclick=()=>crear("libre");$("bTorneo").onclick=()=>crear("torneo");
+const busc=on=>{$("bBuscar").classList.toggle("oc",on);$("bCancel").classList.toggle("oc",!on);$("eI").textContent=on?"🔎 Buscando rival… (no cierres la página)":""};
+$("bBuscar").onclick=()=>{socket.emit("buscar",{nombre:nom()});busc(true)};$("bCancel").onclick=()=>{socket.emit("cancelar");busc(false)};
+socket.on("emparejado",r=>{busc(false);guardar(r.codigo,r.token);socket.emit("reconectar",{codigo:r.codigo,token:r.token},()=>{})});
 $("bUnir").onclick=()=>socket.emit("unirseSala",{codigo:$("cIn").value,nombre:nom()},r=>r.ok?guardar(r.codigo,r.token):$("eI").textContent=r.error);
 $("bIni").onclick=$("bOtra").onclick=()=>socket.emit("iniciar",null,r=>$("eE").textContent=r.ok?"":r.error||"");
 $("cModo").onchange=()=>socket.emit("config",{modo:$("cModo").value});$("cTam").onchange=()=>socket.emit("config",{tam:+$("cTam").value});
