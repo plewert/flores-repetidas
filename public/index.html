@@ -41,6 +41,11 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
 #logros{display:grid;gap:4px;margin:10px 0}h3{color:var(--c);margin:12px 0 6px}
 .cf{position:fixed;top:-30px;font-size:1.6rem;z-index:8;pointer-events:none;animation:cae 3.5s linear forwards}@keyframes cae{to{transform:translateY(110vh) rotate(360deg)}}
 .rxf{top:auto;bottom:90px;font-size:1.3rem;color:#fff;text-shadow:0 0 8px #00e5ff;animation:sub 2.2s ease-out forwards}@keyframes sub{to{transform:translateY(-220px);opacity:0}}
+.gch{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ch{padding:8px 4px;text-align:center;border:2px solid;border-radius:6px;background:rgba(0,10,30,.6);cursor:pointer;font-size:.72rem}
+.ch b{display:block;font-size:2rem;font-weight:400}.ch.bl{opacity:.45;cursor:default}
+.ch.sel{background:rgba(0,229,255,.2);box-shadow:0 0 14px var(--c)}
+.ch.leg:not(.bl){animation:br 2s infinite alternate}@keyframes br{from{box-shadow:0 0 6px #ffc933}to{box-shadow:0 0 22px #ffc933}}
 </style></head><body><main>
 <h1>🌸 Flores Repetidas</h1>
 <section id="inicio" class="p">
@@ -66,7 +71,8 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
  <button id="bVolver1" class="s">Volver</button>
 </section>
 <section id="rank" class="p oc">
- <h3 style="margin-top:0">Mi perfil</h3><div id="perf"></div><div id="logros"></div>
+ <h3 style="margin-top:0">Mi personaje</h3><div id="chs" class="gch"></div>
+ <h3>Mi perfil</h3><div id="perf"></div><div id="logros"></div>
  <h3>🏆 Top 20 jugadores</h3><div id="top"></div>
  <button id="bVolver2" class="s" style="margin-top:10px">Volver</button>
 </section>
@@ -130,19 +136,28 @@ const nmG=()=>{try{return localStorage.getItem("fr-nombre")||""}catch(e){return"
 const pid=(()=>{try{let p=localStorage.getItem("fr-pid");if(!p){p=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now());localStorage.setItem("fr-pid",p)}return p}catch(e){return"anon"+Math.random().toString(36).slice(2)}})();
 let PF=(()=>{try{return JSON.parse(localStorage.getItem("fr-perfil"))}catch(e){return null}})()||{copas:0,torneos:0,partidas:0,parejas:0};
 const LOG=[["🥇","Primera victoria",p=>p.copas>=1],["🎮","Constante: 10 partidas",p=>p.partidas>=10],["🏆","Diez copas",p=>p.copas>=10],["👑","Campeón de torneo",p=>p.torneos>=1],["🌸","Coleccionista: 100 parejas",p=>p.parejas>=100],["🛡️","Veterano: 50 partidas",p=>p.partidas>=50],["💎","Leyenda: 50 copas",p=>p.copas>=50]];
+const CH=[["🌸","Florecita","común","Gratis",p=>true],["🐝","Abeja Obrera","común","Gratis",p=>true],["🐞","Mariquita","común","Gratis",p=>true],
+["🦋","Mariposa Real","raro","3 copas",p=>p.copas>=3],["🦊","Zorro Astuto","raro","15 partidas",p=>p.partidas>=15],["🐢","Tortuga Sabia","raro","60 parejas",p=>p.parejas>=60],
+["🧚","Hada de las Flores","épico","10 copas",p=>p.copas>=10],["🦉","Búho Estratega","épico","40 partidas",p=>p.partidas>=40],["🦚","Pavo Real","épico","1 torneo",p=>p.torneos>=1],
+["🐉","Dragón Jardinero","legendario","25 copas",p=>p.copas>=25],["🦄","Unicornio Floral","legendario","3 torneos",p=>p.torneos>=3],["🧙","Archimago Botánico","legendario","50 copas",p=>p.copas>=50],["🔥","Fénix Eterno","legendario","5 torneos",p=>p.torneos>=5]];
+const RC={"común":"#8aa0b4","raro":"#3a8fe0","épico":"#b44aff","legendario":"#ffc933"};
+let AV=(()=>{try{return localStorage.getItem("fr-av")}catch(e){return null}})()||"🌸";
+function drawCH(){$("chs").innerHTML=CH.map(c=>{const ok=c[4](PF);return `<div class="ch${ok?"":" bl"}${c[0]===AV?" sel":""}${c[2]==="legendario"?" leg":""}" data-a="${c[0]}" style="border-color:${RC[c[2]]}"><b>${ok?c[0]:"🔒"}</b>${c[1]}<br><span style="color:${RC[c[2]]}">${c[2]}</span>${ok?"":"<br>"+c[3]}</div>`}).join("");
+ $("chs").querySelectorAll(".ch:not(.bl)").forEach(d=>d.onclick=()=>{AV=d.dataset.a;try{localStorage.setItem("fr-av",AV)}catch(e){}socket.emit("perfil",{pid,nombre:nmG(),stats:PF,av:AV});drawCH();resumen()})}
 const toast=t=>{const d=document.createElement("div");d.className="toast";d.textContent=t;d.style.top=(14+document.querySelectorAll(".toast").length*46)+"px";document.body.appendChild(d);setTimeout(()=>d.remove(),4500)};
-const resumen=()=>{$("miP").textContent=`🏆 ${PF.copas} copas · 👑 ${PF.torneos} torneos · 🎮 ${PF.partidas} partidas`};resumen();
-socket.on("perfil",x=>{const antes=LOG.filter(l=>l[2](PF)).map(l=>l[1]);PF={copas:x.copas,torneos:x.torneos,partidas:x.partidas,parejas:x.parejas};
+const resumen=()=>{$("miP").textContent=`${AV} 🏆 ${PF.copas} copas · 👑 ${PF.torneos} torneos · 🎮 ${PF.partidas} partidas`};resumen();
+socket.on("perfil",x=>{const antes=LOG.filter(l=>l[2](PF)).map(l=>l[1]).concat(CH.filter(c=>c[4](PF)).map(c=>c[1]));PF={copas:x.copas,torneos:x.torneos,partidas:x.partidas,parejas:x.parejas};
  try{localStorage.setItem("fr-perfil",JSON.stringify(PF))}catch(e){}resumen();
- LOG.filter(l=>l[2](PF)&&!antes.includes(l[1])).forEach(l=>toast(`${l[0]} Logro desbloqueado: ${l[1]}`))});
-function verRank(){
+ LOG.filter(l=>l[2](PF)&&!antes.includes(l[1])).forEach(l=>toast(`${l[0]} Logro desbloqueado: ${l[1]}`));
+ CH.filter(c=>c[4](PF)&&!antes.includes(c[1])).forEach(c=>toast(`${c[0]} ¡Personaje desbloqueado: ${c[1]} (${c[2]})!`))});
+function verRank(){drawCH();
  $("perf").innerHTML=`<div class="c0">🏆 <b>${PF.copas}</b> copas · 👑 <b>${PF.torneos}</b> torneos · 🎮 ${PF.partidas} partidas · 🌸 ${PF.parejas} parejas</div>`;
  $("logros").innerHTML=LOG.map(l=>{const ok=l[2](PF);return `<div style="opacity:${ok?1:.4}">${ok?l[0]:"🔒"} ${l[1]}</div>`}).join("");
  $("top").textContent="Cargando…";
- socket.emit("ranking",null,r=>{$("top").innerHTML=r.top.length?r.top.map((x,i)=>`<div class="fila${x.yo?" yo":""}"><span>${["🥇","🥈","🥉"][i]||(i+1)+"."} ${esc(x.n)}</span><span>🏆${x.c} · 👑${x.t}</span></div>`).join("")+(r.pos>20?`<div class="c0">Tu posición: #${r.pos} de ${r.total}</div>`:""):"Aún no hay partidas jugadas."})}
+ socket.emit("ranking",null,r=>{$("top").innerHTML=r.top.length?r.top.map((x,i)=>`<div class="fila${x.yo?" yo":""}"><span>${["🥇","🥈","🥉"][i]||(i+1)+"."} ${x.a||""} ${esc(x.n)}</span><span>🏆${x.c} · 👑${x.t}</span></div>`).join("")+(r.pos>20?`<div class="c0">Tu posición: #${r.pos} de ${r.total}</div>`:""):"Aún no hay partidas jugadas."})}
 $("bRank").onclick=()=>{ver("rank");verRank()};$("bVolver2").onclick=()=>ver("inicio");
 const guardar=(c,t)=>{miId=t;try{localStorage.setItem("fr-sesion",JSON.stringify({codigo:c,token:t}))}catch(e){}};
-socket.on("connect",()=>{socket.emit("perfil",{pid,nombre:nmG(),stats:PF});const s=sv();if(s)socket.emit("reconectar",s,r=>{if(r.ok)miId=s.token;else try{localStorage.removeItem("fr-sesion")}catch(e){}})});
+socket.on("connect",()=>{socket.emit("perfil",{pid,nombre:nmG(),stats:PF,av:AV});const s=sv();if(s)socket.emit("reconectar",s,r=>{if(r.ok)miId=s.token;else try{localStorage.removeItem("fr-sesion")}catch(e){}})});
 const crear=modo=>socket.emit("crearSala",{nombre:nom(),modo,tam:4},r=>{if(r.ok)guardar(r.codigo,r.token)});
 $("bLibre").onclick=()=>crear("libre");$("bTorneo").onclick=()=>crear("torneo");
 const busc=on=>{$("bBuscar").classList.toggle("oc",on);$("bCancel").classList.toggle("oc",!on);$("eI").textContent=on?"🔎 Buscando rival… (no cierres la página)":""};
@@ -165,7 +180,7 @@ socket.on("chat",m=>{$("log").insertAdjacentHTML("beforeend",`<div><b style="col
 socket.on("sonido",son);
 socket.on("online",o=>{$("onl").textContent=`🟢 ${o.n} conectado${o.n===1?"":"s"}`+(o.b?` · ⚡ ${o.b} buscando partida`:"")});
 socket.on("estado",e=>{if(!miId)return;if(e.fase==="fin"&&(!E||E.fase!=="fin"))confeti();E=e;lim=Date.now()+e.rest;pintar()});
-const chip=(j,e)=>`<div class="j ${j.id===e.turno&&e.fase==="jugando"?"t":""} ${j.elim?"x":""}" style="border-color:${j.color}"><b style="color:${j.color}">${esc(j.nombre)}${j.id===miId?" (tú)":""}</b>${j.conectado?"":" ⚠️"}<br>🏆${j.victorias}${e.juegan.includes(j.id)?" · 🌸"+j.puntos:""}</div>`;
+const chip=(j,e)=>`<div class="j ${j.id===e.turno&&e.fase==="jugando"?"t":""} ${j.elim?"x":""}" style="border-color:${j.color}"><b style="color:${j.color}">${j.av||"🌸"} ${esc(j.nombre)}${j.id===miId?" (tú)":""}</b>${j.conectado?"":" ⚠️"}<br>🏆${j.victorias}${e.juegan.includes(j.id)?" · 🌸"+j.puntos:""}</div>`;
 function pintar(){const e=E,soyH=e.host===miId;
  if(e.fase==="espera"){ver("espera");$("cSala").textContent=e.codigo;$("lE").innerHTML=e.jugadores.map(j=>chip(j,e)).join("");
   $("cfg").classList.toggle("oc",!soyH);$("cModo").value=e.modo;$("cTam").value=e.tam;
