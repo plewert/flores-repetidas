@@ -11,6 +11,7 @@ const TURNO_MS = 20000, FALLO_MS = 1200, salas = {};
 const mez = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const cod = () => { let c; do c = Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.random() * 24 | 0]).join(""); while (salas[c]); return c; };
 const J = (s, id) => s.jugadores.find(j => j.id === id);
+let cola = []; // jugadores buscando partida rápida
 
 function pub(s) {
   const p = s.partida;
@@ -85,7 +86,9 @@ io.on("connection", socket => {
   socket.on("reconectar", ({ codigo, token } = {}, cb = () => {}) => {
     const s = salas[codigo], j = s && J(s, token);
     if (!j) return cb({ ok: false });
-    entrar(s, j); cb({ ok: true }); emit(s);
+    entrar(s, j); cb({ ok: true });
+    if (s.auto && s.fase === "espera" && s.jugadores.every(x => x.conectado)) { s.auto = false; empezar(s, mez(s.jugadores.map(x => x.id))); }
+    emit(s);
   });
   socket.on("config", ({ modo, tam } = {}) => {
     const s = sala(); if (!s || s.host !== yo || s.fase !== "espera") return;
@@ -123,7 +126,21 @@ io.on("connection", socket => {
     const s = sala(), j = s && J(s, yo);
     if (j) io.to(s.codigo).emit("chat", { n: j.nombre, c: j.color, t: String(t).slice(0, 120) });
   });
+  socket.on("buscar", ({ nombre } = {}) => {
+    cola = cola.filter(x => x.socket !== socket && x.socket.connected);
+    cola.push({ socket, nombre });
+    if (cola.length < 2) return;
+    const [a, b] = cola.splice(0, 2), c = cod();
+    const s = salas[c] = { codigo: c, host: null, modo: "libre", tam: 4, fase: "espera", auto: true, jugadores: [] };
+    [a, b].forEach(x => {
+      const id = crypto.randomUUID(), j = nuevo(s, id, x.nombre); j.conectado = false;
+      if (!s.host) s.host = id;
+      x.socket.emit("emparejado", { codigo: c, token: id });
+    });
+  });
+  socket.on("cancelar", () => { cola = cola.filter(x => x.socket !== socket); });
   socket.on("disconnect", () => {
+    cola = cola.filter(x => x.socket !== socket);
     const s = sala(); if (!s) return;
     const j = J(s, yo); if (!j || j.sid !== socket.id) return;
     if (s.fase === "espera") {
