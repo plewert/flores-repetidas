@@ -137,9 +137,9 @@ const pid=(()=>{try{let p=localStorage.getItem("fr-pid");if(!p){p=(crypto.random
 let PF=(()=>{try{return JSON.parse(localStorage.getItem("fr-perfil"))}catch(e){return null}})()||{copas:0,torneos:0,partidas:0,parejas:0};
 const LOG=[["🥇","Primera victoria",p=>p.copas>=1],["🎮","Constante: 10 partidas",p=>p.partidas>=10],["🏆","Diez copas",p=>p.copas>=10],["👑","Campeón de torneo",p=>p.torneos>=1],["🌸","Coleccionista: 100 parejas",p=>p.parejas>=100],["🛡️","Veterano: 50 partidas",p=>p.partidas>=50],["💎","Leyenda: 50 copas",p=>p.copas>=50]];
 const CH=[["🌸","Florecita","común","Gratis",p=>true],["🐝","Abeja Obrera","común","Gratis",p=>true],["🐞","Mariquita","común","Gratis",p=>true],
-["🦋","Mariposa Real","raro","3 copas",p=>p.copas>=3],["🦊","Zorro Astuto","raro","15 partidas",p=>p.partidas>=15],["🐢","Tortuga Sabia","raro","60 parejas",p=>p.parejas>=60],
-["🧚","Hada de las Flores","épico","10 copas",p=>p.copas>=10],["🦉","Búho Estratega","épico","40 partidas",p=>p.partidas>=40],["🦚","Pavo Real","épico","1 torneo",p=>p.torneos>=1],
-["🐉","Dragón Jardinero","legendario","25 copas",p=>p.copas>=25],["🦄","Unicornio Floral","legendario","3 torneos",p=>p.torneos>=3],["🧙","Archimago Botánico","legendario","50 copas",p=>p.copas>=50],["🔥","Fénix Eterno","legendario","5 torneos",p=>p.torneos>=5]];
+["🦋","Mariposa Real","raro","40 copas",p=>p.copas>=40],["🦊","Zorro Astuto","raro","60 partidas",p=>p.partidas>=60],["🐢","Tortuga Sabia","raro","180 parejas",p=>p.parejas>=180],
+["🧚","Hada de las Flores","épico","100 copas",p=>p.copas>=100],["🦉","Búho Estratega","épico","150 partidas",p=>p.partidas>=150],["🦚","Pavo Real","épico","1 torneo",p=>p.torneos>=1],
+["🐉","Dragón Jardinero","legendario","250 copas",p=>p.copas>=250],["🦄","Unicornio Floral","legendario","3 torneos",p=>p.torneos>=3],["🧙","Archimago Botánico","legendario","300 copas",p=>p.copas>=300],["🔥","Fénix Eterno","legendario","5 torneos",p=>p.torneos>=5]];
 const RC={"común":"#8aa0b4","raro":"#3a8fe0","épico":"#b44aff","legendario":"#ffc933"};
 let AV=(()=>{try{return localStorage.getItem("fr-av")}catch(e){return null}})()||"🌸";
 function drawCH(){$("chs").innerHTML=CH.map(c=>{const ok=c[4](PF);return `<div class="ch${ok?"":" bl"}${c[0]===AV?" sel":""}${c[2]==="legendario"?" leg":""}" data-a="${c[0]}" style="border-color:${RC[c[2]]}"><b>${ok?c[0]:"🔒"}</b>${c[1]}<br><span style="color:${RC[c[2]]}">${c[2]}</span>${ok?"":"<br>"+c[3]}</div>`}).join("");
