@@ -52,13 +52,13 @@ function finPartida(s) {
   io.to(s.codigo).emit("sonido", "fin");
   if (gan.length > 1) {
     s.aviso = "Empate: se repite la partida"; s.fase = "pausa"; emit(s);
-    return setTimeout(() => { empezar(s, p.ids); emit(s); }, 3000);
+    return setTimeout(() => { if (s.fase === "pausa" && !p.decidida) { empezar(s, p.ids); emit(s); } }, 3000);
   }
-  gan[0].victorias++;
+  gan[0].victorias++; p.decidida = true;
   if (s.modo === "libre") { s.fase = "fin"; s.campeon = gan[0].id; s.aviso = "🏆 Ganó " + gan[0].nombre; return emit(s); }
   p.ids.forEach(i => { if (i !== gan[0].id) J(s, i).elim = true; });
   s.ronda.gan.push(gan[0].id); s.aviso = gan[0].nombre + " avanza"; s.fase = "pausa"; emit(s);
-  setTimeout(() => siguiente(s), 3500);
+  setTimeout(() => { if (s.fase === "pausa") siguiente(s); }, 3500);
 }
 
 io.on("connection", socket => {
@@ -119,12 +119,43 @@ io.on("connection", socket => {
       p.cartas.every(x => x.e === "emparejada") ? finPartida(s) : reloj(s);
     } else {
       p.bloq = true; io.to(s.codigo).emit("sonido", "no");
-      setTimeout(() => { A.e = B.e = "oculta"; p.bloq = false; p.turno = (p.turno + 1) % p.ids.length; reloj(s); emit(s); }, FALLO_MS);
+      setTimeout(() => { if (s.partida !== p || !p.bloq) return; A.e = B.e = "oculta"; p.bloq = false; p.turno = (p.turno + 1) % p.ids.length; reloj(s); emit(s); }, FALLO_MS);
     }
   });
   socket.on("chat", t => {
     const s = sala(), j = s && J(s, yo);
     if (j) io.to(s.codigo).emit("chat", { n: j.nombre, c: j.color, t: String(t).slice(0, 120) });
+  });
+  socket.on("salir", () => {
+    const s = sala(), j = s && J(s, yo);
+    if (!s || !j) return;
+    const id = yo; socket.leave(s.codigo); cs = null; yo = null;
+    j.salio = true; j.conectado = false; j.elim = true;
+    if (s.fase === "espera" || s.fase === "fin") s.jugadores = s.jugadores.filter(x => x !== j);
+    else {
+      if (s.ronda) { s.ronda.pend = s.ronda.pend.filter(i => i !== id); s.ronda.gan = s.ronda.gan.filter(i => i !== id); }
+      const p = s.partida;
+      if (p && !p.decidida && p.ids.includes(id)) {
+        clearTimeout(p.t); p.bloq = false; p.vol = [];
+        p.cartas.forEach(c => { if (c.e === "volteada") c.e = "oculta"; });
+        const rest = p.ids.filter(i => i !== id);
+        if (s.modo === "libre" && rest.length >= 2) {
+          let t = p.turno; if (p.ids.indexOf(id) < t) t--;
+          p.ids = rest; p.turno = t >= rest.length ? 0 : t; reloj(s);
+        } else {
+          const g = J(s, rest[0]); g.victorias++; p.decidida = true;
+          if (s.modo === "libre") { s.fase = "fin"; s.campeon = g.id; s.aviso = "🏆 Ganó " + g.nombre + " (el rival salió)"; }
+          else { s.ronda.gan.push(g.id); s.aviso = g.nombre + " avanza (el rival salió)"; s.fase = "pausa"; setTimeout(() => { if (s.fase === "pausa") siguiente(s); }, 3000); }
+        }
+      }
+      const act = s.jugadores.filter(x => !x.salio);
+      if (act.length < 2 && s.fase !== "fin" && act.length === 1) {
+        if (p) clearTimeout(p.t); s.fase = "fin"; s.campeon = act[0].id; s.aviso = "🏆 Ganó " + act[0].nombre + " (los demás salieron)";
+      }
+    }
+    if (!s.jugadores.some(x => !x.salio)) { if (s.partida) clearTimeout(s.partida.t); delete salas[s.codigo]; return; }
+    if (s.host === id) s.host = s.jugadores.find(x => !x.salio).id;
+    emit(s);
   });
   socket.on("buscar", ({ nombre } = {}) => {
     cola = cola.filter(x => x.socket !== socket && x.socket.connected);
