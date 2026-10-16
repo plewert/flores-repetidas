@@ -1,271 +1,139 @@
-// ============================================================
-//  Servidor del juego "Flores repetidas" (memoria multijugador)
-//  Gana quien consiga más parejas de flores iguales.
-//
-//  Instalación:
-//    npm init -y
-//    npm install express socket.io
-//    node server.js
-//
-//  Abre http://localhost:3000  (sirve los archivos de /public)
-// ============================================================
-
-const express = require("express");
-const http = require("http");
+// Flores Repetidas v2: partida libre (2-4), torneo eliminatorio (2-10), reconexión, chat, temporizador
+const express = require("express"), http = require("http"), crypto = require("crypto");
 const { Server } = require("socket.io");
-
-const app = express();
-const server = http.createServer(app);
+const app = express(), server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
-
-const PORT = process.env.PORT || 3000;
-const MAX_JUGADORES = 4;
-const PAREJAS = 8; // 16 cartas (tablero 4x4)
-const RETRASO_FALLO_MS = 1200; // tiempo que se ven las cartas si no coinciden
-
-const FLORES = ["🌹", "🌻", "🌷", "🌸", "🌼", "🌺", "💐", "🪻", "🪷", "🏵️"];
-
 app.use(express.static("public"));
 
-// salas[codigo] = { codigo, host, jugadores[], cartas[], turno, volteadas[], fase, bloqueada }
-const salas = {};
+const F = ["🌹","🌻","🌷","🌸","🌼","🌺","💐","🪻","🪷","🏵️","🌿","🍀","🌵","🌴","🌱","🍁","🍄","🌾"];
+const COL = ["#e0457b","#3a8fe0","#3aa76d","#e0a030","#8f5ae0","#e05a2a","#20b2aa","#a0522d","#d63fd6","#607d8b"];
+const TURNO_MS = 20000, FALLO_MS = 1200, salas = {};
+const mez = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const cod = () => { let c; do c = Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.random() * 24 | 0]).join(""); while (salas[c]); return c; };
+const J = (s, id) => s.jugadores.find(j => j.id === id);
 
-// ---------- utilidades ----------
-function generarCodigo() {
-  const letras = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  let codigo;
-  do {
-    codigo = Array.from({ length: 4 }, () => letras[Math.floor(Math.random() * letras.length)]).join("");
-  } while (salas[codigo]);
-  return codigo;
-}
-
-function mezclar(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-function crearTablero() {
-  const elegidas = mezclar([...FLORES]).slice(0, PAREJAS);
-  const cartas = mezclar([...elegidas, ...elegidas]).map((flor) => ({
-    flor,
-    estado: "oculta", // oculta | volteada | emparejada
-  }));
-  return cartas;
-}
-
-// Vista pública: NO revela la flor de las cartas ocultas (anti-trampas)
-function estadoPublico(sala) {
+function pub(s) {
+  const p = s.partida;
   return {
-    codigo: sala.codigo,
-    fase: sala.fase, // espera | jugando | terminado
-    host: sala.host,
-    turno: sala.jugadores[sala.turno]?.id ?? null,
-    jugadores: sala.jugadores.map((j) => ({
-      id: j.id,
-      nombre: j.nombre,
-      puntos: j.puntos,
-    })),
-    cartas: sala.cartas.map((c) => ({
-      estado: c.estado,
-      flor: c.estado === "oculta" ? null : c.flor,
-    })),
-    ganadores: sala.ganadores || [],
+    codigo: s.codigo, host: s.host, modo: s.modo, tam: s.tam, fase: s.fase, ronda: s.ronda ? s.ronda.num : 0,
+    campeon: s.campeon || null, aviso: s.aviso || "",
+    jugadores: s.jugadores.map(j => ({ id: j.id, nombre: j.nombre, color: j.color, victorias: j.victorias, puntos: j.puntos, conectado: j.conectado, elim: !!j.elim })),
+    juegan: p ? p.ids : [], turno: p ? p.ids[p.turno] : null, rest: p ? Math.max(0, p.limite - Date.now()) : 0,
+    cartas: p ? p.cartas.map(c => ({ e: c.e, f: c.e === "oculta" ? null : c.f })) : []
   };
 }
+const emit = s => io.to(s.codigo).emit("estado", pub(s));
 
-function emitirEstado(sala) {
-  io.to(sala.codigo).emit("estado", estadoPublico(sala));
+function reloj(s) {
+  const p = s.partida; clearTimeout(p.t); p.limite = Date.now() + TURNO_MS;
+  p.t = setTimeout(() => {
+    p.vol.forEach(i => p.cartas[i].e = "oculta"); p.vol = []; p.bloq = false;
+    p.turno = (p.turno + 1) % p.ids.length; reloj(s); emit(s);
+  }, TURNO_MS);
+}
+function empezar(s, ids) {
+  const fl = mez([...F]).slice(0, s.tam * s.tam / 2);
+  s.partida = { ids, cartas: mez([...fl, ...fl]).map(f => ({ f, e: "oculta" })), turno: 0, vol: [], bloq: false, limite: 0 };
+  ids.forEach(i => J(s, i).puntos = 0); s.fase = "jugando"; s.aviso = ""; reloj(s);
+}
+function siguiente(s) {
+  const r = s.ronda;
+  for (;;) {
+    if (r.pend.length >= 2) { empezar(s, [r.pend.shift(), r.pend.shift()]); return emit(s); }
+    if (r.pend.length === 1) r.gan.push(r.pend.shift());
+    if (r.gan.length === 1) { s.fase = "fin"; s.campeon = r.gan[0]; s.aviso = "🏆 Campeón: " + J(s, r.gan[0]).nombre; return emit(s); }
+    r.pend = r.gan; r.gan = []; r.num++;
+  }
+}
+function finPartida(s) {
+  const p = s.partida; clearTimeout(p.t);
+  const js = p.ids.map(i => J(s, i)), max = Math.max(...js.map(j => j.puntos)), gan = js.filter(j => j.puntos === max);
+  io.to(s.codigo).emit("sonido", "fin");
+  if (gan.length > 1) {
+    s.aviso = "Empate: se repite la partida"; s.fase = "pausa"; emit(s);
+    return setTimeout(() => { empezar(s, p.ids); emit(s); }, 3000);
+  }
+  gan[0].victorias++;
+  if (s.modo === "libre") { s.fase = "fin"; s.campeon = gan[0].id; s.aviso = "🏆 Ganó " + gan[0].nombre; return emit(s); }
+  p.ids.forEach(i => { if (i !== gan[0].id) J(s, i).elim = true; });
+  s.ronda.gan.push(gan[0].id); s.aviso = gan[0].nombre + " avanza"; s.fase = "pausa"; emit(s);
+  setTimeout(() => siguiente(s), 3500);
 }
 
-function siguienteTurno(sala) {
-  sala.turno = (sala.turno + 1) % sala.jugadores.length;
-}
+io.on("connection", socket => {
+  let cs = null, yo = null;
+  const sala = () => salas[cs];
+  const entrar = (s, j) => { cs = s.codigo; yo = j.id; j.sid = socket.id; j.conectado = true; socket.join(s.codigo); clearTimeout(s.lim); };
+  const nuevo = (s, id, nombre) => {
+    const j = { id, nombre: String(nombre || "").trim().slice(0, 16) || "Jugador", victorias: 0, puntos: 0, conectado: true,
+      color: COL.find(c => !s.jugadores.some(x => x.color === c)) || COL[0] };
+    s.jugadores.push(j); return j;
+  };
 
-function terminarSiCorresponde(sala) {
-  const quedan = sala.cartas.some((c) => c.estado !== "emparejada");
-  if (quedan) return false;
-
-  sala.fase = "terminado";
-  const max = Math.max(...sala.jugadores.map((j) => j.puntos));
-  sala.ganadores = sala.jugadores.filter((j) => j.puntos === max).map((j) => j.id);
-  emitirEstado(sala);
-  io.to(sala.codigo).emit("finJuego", {
-    ganadores: sala.jugadores.filter((j) => j.puntos === max).map((j) => j.nombre),
-    empate: sala.ganadores.length > 1,
-    puntos: max,
+  socket.on("crearSala", ({ nombre, modo, tam } = {}, cb = () => {}) => {
+    const c = cod(), id = crypto.randomUUID();
+    const s = salas[c] = { codigo: c, host: id, modo: modo === "torneo" ? "torneo" : "libre", tam: tam === 6 ? 6 : 4, fase: "espera", jugadores: [] };
+    entrar(s, nuevo(s, id, nombre)); cb({ ok: true, codigo: c, token: id }); emit(s);
   });
-  return true;
-}
-
-function limpiarNombre(nombre) {
-  return String(nombre || "Jugador").trim().slice(0, 16) || "Jugador";
-}
-
-// ---------- sockets ----------
-io.on("connection", (socket) => {
-  let codigoSala = null;
-
-  const salaActual = () => salas[codigoSala];
-
-  // Crear sala
-  socket.on("crearSala", ({ nombre } = {}, cb = () => {}) => {
-    const codigo = generarCodigo();
-    salas[codigo] = {
-      codigo,
-      host: socket.id,
-      jugadores: [{ id: socket.id, nombre: limpiarNombre(nombre), puntos: 0 }],
-      cartas: [],
-      turno: 0,
-      volteadas: [],
-      fase: "espera",
-      bloqueada: false,
-      ganadores: [],
-    };
-    codigoSala = codigo;
-    socket.join(codigo);
-    cb({ ok: true, codigo, id: socket.id });
-    emitirEstado(salas[codigo]);
-  });
-
-  // Unirse a sala
   socket.on("unirseSala", ({ codigo, nombre } = {}, cb = () => {}) => {
-    codigo = String(codigo || "").toUpperCase().trim();
-    const sala = salas[codigo];
-    if (!sala) return cb({ ok: false, error: "La sala no existe" });
-    if (sala.fase !== "espera") return cb({ ok: false, error: "La partida ya empezó" });
-    if (sala.jugadores.length >= MAX_JUGADORES) return cb({ ok: false, error: "Sala llena" });
-
-    sala.jugadores.push({ id: socket.id, nombre: limpiarNombre(nombre), puntos: 0 });
-    codigoSala = codigo;
-    socket.join(codigo);
-    cb({ ok: true, codigo, id: socket.id });
-    emitirEstado(sala);
+    const s = salas[String(codigo || "").toUpperCase().trim()];
+    if (!s) return cb({ ok: false, error: "La sala no existe" });
+    if (s.fase !== "espera") return cb({ ok: false, error: "La partida ya empezó" });
+    if (s.jugadores.length >= (s.modo === "torneo" ? 10 : 4)) return cb({ ok: false, error: "Sala llena" });
+    const id = crypto.randomUUID(); entrar(s, nuevo(s, id, nombre)); cb({ ok: true, codigo: s.codigo, token: id }); emit(s);
   });
-
-  // Iniciar partida (solo el host)
+  socket.on("reconectar", ({ codigo, token } = {}, cb = () => {}) => {
+    const s = salas[codigo], j = s && J(s, token);
+    if (!j) return cb({ ok: false });
+    entrar(s, j); cb({ ok: true }); emit(s);
+  });
+  socket.on("config", ({ modo, tam } = {}) => {
+    const s = sala(); if (!s || s.host !== yo || s.fase !== "espera") return;
+    if (modo) s.modo = modo === "torneo" ? "torneo" : "libre";
+    if (tam) s.tam = tam === 6 ? 6 : 4;
+    emit(s);
+  });
   socket.on("iniciar", (_, cb = () => {}) => {
-    const sala = salaActual();
-    if (!sala) return cb({ ok: false, error: "No estás en una sala" });
-    if (sala.host !== socket.id) return cb({ ok: false, error: "Solo el anfitrión puede iniciar" });
-    if (sala.jugadores.length < 2) return cb({ ok: false, error: "Se necesitan al menos 2 jugadores" });
-    if (sala.fase === "jugando") return cb({ ok: false, error: "Ya está en juego" });
-
-    sala.cartas = crearTablero();
-    sala.jugadores.forEach((j) => (j.puntos = 0));
-    sala.turno = 0;
-    sala.volteadas = [];
-    sala.ganadores = [];
-    sala.bloqueada = false;
-    sala.fase = "jugando";
+    const s = sala(); if (!s || s.host !== yo || !["espera", "fin"].includes(s.fase)) return cb({ ok: false });
+    const act = s.jugadores.filter(j => j.conectado);
+    if (act.length < 2) return cb({ ok: false, error: "Se necesitan al menos 2 jugadores" });
+    if (s.modo === "libre" && act.length > 4) return cb({ ok: false, error: "Máximo 4 en partida libre" });
+    s.jugadores = act; s.jugadores.forEach(j => { j.elim = false; j.puntos = 0; }); s.campeon = null;
+    if (s.modo === "libre") { empezar(s, mez(act.map(j => j.id))); emit(s); }
+    else { s.ronda = { num: 1, pend: mez(act.map(j => j.id)), gan: [] }; siguiente(s); }
     cb({ ok: true });
-    emitirEstado(sala);
   });
-
-  // Voltear una carta
-  socket.on("voltear", ({ indice } = {}, cb = () => {}) => {
-    const sala = salaActual();
-    if (!sala || sala.fase !== "jugando") return cb({ ok: false });
-    if (sala.bloqueada) return cb({ ok: false, error: "Espera..." });
-
-    const jugador = sala.jugadores[sala.turno];
-    if (jugador.id !== socket.id) return cb({ ok: false, error: "No es tu turno" });
-
-    const carta = sala.cartas[indice];
-    if (!Number.isInteger(indice) || !carta || carta.estado !== "oculta") {
-      return cb({ ok: false, error: "Carta no válida" });
-    }
-
-    carta.estado = "volteada";
-    sala.volteadas.push(indice);
-    cb({ ok: true });
-    emitirEstado(sala);
-
-    if (sala.volteadas.length < 2) return;
-
-    // Ya hay dos cartas volteadas: comprobar
-    const [a, b] = sala.volteadas;
-    sala.volteadas = [];
-
-    if (sala.cartas[a].flor === sala.cartas[b].flor) {
-      // ¡Pareja! Suma punto y repite turno
-      sala.cartas[a].estado = "emparejada";
-      sala.cartas[b].estado = "emparejada";
-      jugador.puntos += 1;
-      io.to(sala.codigo).emit("pareja", { jugador: jugador.nombre, flor: sala.cartas[a].flor });
-      emitirEstado(sala);
-      terminarSiCorresponde(sala);
+  socket.on("voltear", ({ i } = {}) => {
+    const s = sala(), p = s && s.partida;
+    if (!p || s.fase !== "jugando" || p.bloq || p.ids[p.turno] !== yo) return;
+    const c = p.cartas[i]; if (!c || c.e !== "oculta") return;
+    c.e = "volteada"; p.vol.push(i); emit(s);
+    if (p.vol.length < 2) return;
+    clearTimeout(p.t);
+    const [a, b] = p.vol; p.vol = []; const A = p.cartas[a], B = p.cartas[b];
+    if (A.f === B.f) {
+      A.e = B.e = "emparejada"; J(s, yo).puntos++; io.to(s.codigo).emit("sonido", "ok"); emit(s);
+      p.cartas.every(x => x.e === "emparejada") ? finPartida(s) : reloj(s);
     } else {
-      // Fallo: se muestran un momento y luego se ocultan
-      sala.bloqueada = true;
-      setTimeout(() => {
-        if (!salas[sala.codigo]) return;
-        sala.cartas[a].estado = "oculta";
-        sala.cartas[b].estado = "oculta";
-        siguienteTurno(sala);
-        sala.bloqueada = false;
-        emitirEstado(sala);
-      }, RETRASO_FALLO_MS);
+      p.bloq = true; io.to(s.codigo).emit("sonido", "no");
+      setTimeout(() => { A.e = B.e = "oculta"; p.bloq = false; p.turno = (p.turno + 1) % p.ids.length; reloj(s); emit(s); }, FALLO_MS);
     }
   });
-
-  // Nueva partida (solo el host, cuando terminó)
-  socket.on("reiniciar", (_, cb = () => {}) => {
-    const sala = salaActual();
-    if (!sala || sala.host !== socket.id) return cb({ ok: false });
-    sala.fase = "espera";
-    sala.cartas = [];
-    sala.ganadores = [];
-    sala.jugadores.forEach((j) => (j.puntos = 0));
-    cb({ ok: true });
-    emitirEstado(sala);
+  socket.on("chat", t => {
+    const s = sala(), j = s && J(s, yo);
+    if (j) io.to(s.codigo).emit("chat", { n: j.nombre, c: j.color, t: String(t).slice(0, 120) });
   });
-
-  // Desconexión
   socket.on("disconnect", () => {
-    const sala = salaActual();
-    if (!sala) return;
-
-    const idx = sala.jugadores.findIndex((j) => j.id === socket.id);
-    if (idx === -1) return;
-    sala.jugadores.splice(idx, 1);
-
-    if (sala.jugadores.length === 0) {
-      delete salas[sala.codigo];
-      return;
-    }
-
-    if (sala.host === socket.id) sala.host = sala.jugadores[0].id;
-
-    if (sala.fase === "jugando") {
-      if (sala.jugadores.length < 2) {
-        // Se quedó solo: termina la partida
-        sala.fase = "terminado";
-        sala.ganadores = [sala.jugadores[0].id];
-        io.to(sala.codigo).emit("finJuego", {
-          ganadores: [sala.jugadores[0].nombre],
-          empate: false,
-          puntos: sala.jugadores[0].puntos,
-          motivo: "Los demás jugadores se fueron",
-        });
-      } else {
-        // Ajustar el turno
-        if (idx < sala.turno) sala.turno -= 1;
-        if (sala.turno >= sala.jugadores.length) sala.turno = 0;
-        // Si se iba con cartas volteadas, ocultarlas
-        sala.volteadas.forEach((i) => {
-          if (sala.cartas[i].estado === "volteada") sala.cartas[i].estado = "oculta";
-        });
-        sala.volteadas = [];
-      }
-    }
-    emitirEstado(sala);
+    const s = sala(); if (!s) return;
+    const j = J(s, yo); if (!j || j.sid !== socket.id) return;
+    if (s.fase === "espera") {
+      s.jugadores = s.jugadores.filter(x => x !== j);
+      if (s.host === yo && s.jugadores[0]) s.host = s.jugadores[0].id;
+    } else j.conectado = false;
+    if (!s.jugadores.some(x => x.conectado)) s.lim = setTimeout(() => { if (s.partida) clearTimeout(s.partida.t); delete salas[s.codigo]; }, 600000);
+    else emit(s);
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`🌸 Servidor de Flores Repetidas en http://localhost:${PORT}`);
-});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log("🌸 Flores Repetidas v2 en http://localhost:" + PORT));
