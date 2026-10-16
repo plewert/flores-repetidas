@@ -12,6 +12,7 @@ const mez = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor
 const cod = () => { let c; do c = Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.random() * 24 | 0]).join(""); while (salas[c]); return c; };
 const J = (s, id) => s.jugadores.find(j => j.id === id);
 let cola = []; // jugadores buscando partida rápida
+const difundir = () => io.emit("online", { n: io.sockets.sockets.size, b: cola.length });
 
 function pub(s) {
   const p = s.partida;
@@ -63,6 +64,7 @@ function finPartida(s) {
 
 io.on("connection", socket => {
   let cs = null, yo = null;
+  difundir();
   const sala = () => salas[cs];
   const entrar = (s, j) => { cs = s.codigo; yo = j.id; j.sid = socket.id; j.conectado = true; socket.join(s.codigo); clearTimeout(s.lim); };
   const nuevo = (s, id, nombre) => {
@@ -160,7 +162,7 @@ io.on("connection", socket => {
   socket.on("buscar", ({ nombre } = {}) => {
     cola = cola.filter(x => x.socket !== socket && x.socket.connected);
     cola.push({ socket, nombre });
-    if (cola.length < 2) return;
+    if (cola.length < 2) return difundir();
     const [a, b] = cola.splice(0, 2), c = cod();
     const s = salas[c] = { codigo: c, host: null, modo: "libre", tam: 4, fase: "espera", auto: true, jugadores: [] };
     [a, b].forEach(x => {
@@ -168,10 +170,11 @@ io.on("connection", socket => {
       if (!s.host) s.host = id;
       x.socket.emit("emparejado", { codigo: c, token: id });
     });
+    difundir();
   });
-  socket.on("cancelar", () => { cola = cola.filter(x => x.socket !== socket); });
+  socket.on("cancelar", () => { cola = cola.filter(x => x.socket !== socket); difundir(); });
   socket.on("disconnect", () => {
-    cola = cola.filter(x => x.socket !== socket);
+    cola = cola.filter(x => x.socket !== socket); difundir();
     const s = sala(); if (!s) return;
     const j = J(s, yo); if (!j || j.sid !== socket.id) return;
     if (s.fase === "espera") {
