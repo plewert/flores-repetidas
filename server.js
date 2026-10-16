@@ -20,7 +20,16 @@ let stats = {}, sucio = false;
 try { stats = JSON.parse(fs.readFileSync(ARCH, "utf8")); } catch (e) {}
 setInterval(() => { if (sucio) { sucio = false; try { fs.writeFileSync(ARCH, JSON.stringify(stats)); } catch (e) {} } }, 10000);
 const AVS = new Set(["🌸","🐝","🐞","🦋","🦊","🐢","🧚","🦉","🦚","🐉","🦄","🧙","🔥"]);
-const st = (k, n) => stats[k] = stats[k] || { nombre: n || "Jugador", copas: 0, torneos: 0, partidas: 0, parejas: 0 };
+// personajes que solo salen en cofres (mismo orden y rareza que en el cliente)
+const CF = ["🐱","🐶","🐸","🐼","🐵","🥷","🤖","🦅","🐺","👽","🐲","🦖","🧞","🧜"], RARCF = [0,0,0,0,0,1,1,1,1,2,2,2,3,3], CFS = new Set(CF), COFRE = 50;
+CF.forEach(c => AVS.add(c));
+function st(k, n) {
+  const x = stats[k] = stats[k] || { nombre: n || "Jugador", copas: 0, torneos: 0, partidas: 0, parejas: 0 };
+  x.gastado = x.gastado || 0; x.bonus = x.bonus || 0; x.items = x.items || [];
+  return x;
+}
+// monedas = 10 por copa + 25 por torneo + 2 por partida + 1 por pareja + bonus - gastado
+const saldo = x => x.copas * 10 + x.torneos * 25 + x.partidas * 2 + x.parejas + x.bonus - x.gastado;
 function reg(j, d) {
   if (!j || !j.pid) return;
   const x = st(j.pid, j.nombre); x.nombre = j.nombre;
@@ -149,16 +158,28 @@ io.on("connection", socket => {
     if (k === "p_") return;
     socket.data.pid = k;
     const x = st(k, nombre); if (nombre) x.nombre = String(nombre).slice(0, 16);
-    for (const f of ["copas", "torneos", "partidas", "parejas"]) {
+    for (const f of ["copas", "torneos", "partidas", "parejas", "gastado", "bonus"]) {
       const v = Number(c && c[f]);
       if (v >= 0 && v < 1e5 && v > x[f]) { x[f] = Math.floor(v); sucio = true; }
     }
-    if (AVS.has(av)) {
+    if (c && Array.isArray(c.items)) c.items.forEach(i => { if (CFS.has(i) && !x.items.includes(i)) { x.items.push(i); sucio = true; } });
+    if (AVS.has(av) && (!CFS.has(av) || x.items.includes(av))) {
       socket.data.av = av; x.av = av; sucio = true;
       const s = sala(), j = s && J(s, yo);
       if (j) { j.av = av; emit(s); }
     }
     socket.emit("perfil", x);
+  });
+  socket.on("cofre", (_, cb = () => {}) => {
+    const k = socket.data.pid; if (!k) return cb({ ok: false, error: "Sin perfil" });
+    const x = st(k);
+    if (saldo(x) < COFRE) return cb({ ok: false, error: "Te faltan monedas" });
+    x.gastado += COFRE;
+    const u = Math.random() * 100, rar = u < 60 ? 0 : u < 88 ? 1 : u < 98 ? 2 : 3;
+    const pool = CF.filter((_, i) => RARCF[i] === rar), a = pool[Math.random() * pool.length | 0];
+    const dup = x.items.includes(a);
+    if (dup) x.bonus += 25; else x.items.push(a);
+    sucio = true; socket.emit("perfil", x); cb({ ok: true, a, dup });
   });
   socket.on("reaccion", e => {
     const s = sala(), j = s && J(s, yo);
