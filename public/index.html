@@ -60,13 +60,14 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
  <div id="cfg"><select id="cModo"><option value="libre">Partida libre (2-4)</option><option value="torneo">Torneo eliminatorio (2-10)</option></select>
  <select id="cTam"><option value="4">Tablero 4x4</option><option value="6">Tablero 6x6</option></select>
  <button id="bIni">Iniciar</button></div>
- <p id="mE" class="c0"></p><div id="eE" class="er"></div>
+ <button id="bSalirE" class="s">⬅ Salir de la sala</button><p id="mE" class="c0"></p><div id="eE" class="er"></div>
 </section>
 <section id="juego" class="oc">
  <div id="hd" class="c0"></div><div id="mar" class="js"></div>
  <div id="bw"><div id="barra"></div></div>
  <div id="tab"></div><div id="msg" class="m"></div>
  <div id="fin" class="oc"><button id="bOtra">Jugar otra vez</button></div>
+ <button id="bSalir" class="s">⬅ Salir de la partida</button>
  <div class="p" style="margin-top:10px"><div id="log"></div><input id="ch" placeholder="Escribe y pulsa Enter" maxlength="120" style="margin:0"></div>
 </section></main>
 <script src="/socket.io/socket.io.js"></script>
@@ -106,9 +107,12 @@ $("bUnir").onclick=()=>socket.emit("unirseSala",{codigo:$("cIn").value,nombre:no
 $("bIni").onclick=$("bOtra").onclick=()=>socket.emit("iniciar",null,r=>$("eE").textContent=r.ok?"":r.error||"");
 $("cModo").onchange=()=>socket.emit("config",{modo:$("cModo").value});$("cTam").onchange=()=>socket.emit("config",{tam:+$("cTam").value});
 $("ch").onkeydown=e=>{if(e.key==="Enter"&&e.target.value.trim()){socket.emit("chat",e.target.value);e.target.value=""}};
+const salir=()=>{if(E&&(E.fase==="jugando"||E.fase==="pausa")&&E.juegan.includes(miId)&&!confirm("¿Salir de la partida? Tu rival ganará."))return;
+ socket.emit("salir");try{localStorage.removeItem("fr-sesion")}catch(e){}E=null;miId=null;$("log").innerHTML="";$("eE").textContent="";ver("inicio")};
+$("bSalir").onclick=$("bSalirE").onclick=salir;
 socket.on("chat",m=>{$("log").insertAdjacentHTML("beforeend",`<div><b style="color:${m.c}">${esc(m.n)}:</b> ${esc(m.t)}</div>`);$("log").scrollTop=1e9});
 socket.on("sonido",son);
-socket.on("estado",e=>{E=e;lim=Date.now()+e.rest;pintar()});
+socket.on("estado",e=>{if(!miId)return;E=e;lim=Date.now()+e.rest;pintar()});
 const chip=(j,e)=>`<div class="j ${j.id===e.turno&&e.fase==="jugando"?"t":""} ${j.elim?"x":""}" style="border-color:${j.color}"><b style="color:${j.color}">${esc(j.nombre)}${j.id===miId?" (tú)":""}</b>${j.conectado?"":" ⚠️"}<br>🏆${j.victorias}${e.juegan.includes(j.id)?" · 🌸"+j.puntos:""}</div>`;
 function pintar(){const e=E,soyH=e.host===miId;
  if(e.fase==="espera"){ver("espera");$("cSala").textContent=e.codigo;$("lE").innerHTML=e.jugadores.map(j=>chip(j,e)).join("");
