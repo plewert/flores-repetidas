@@ -12,6 +12,20 @@ const mez = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor
 const cod = () => { let c; do c = Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.random() * 24 | 0]).join(""); while (salas[c]); return c; };
 const J = (s, id) => s.jugadores.find(j => j.id === id);
 let cola = []; // jugadores buscando partida rápida
+// ---- estadísticas por jugador (copas, torneos...) ----
+// Se guardan en datos.json. En Render gratis el disco se borra al reiniciar, pero cada jugador
+// guarda su copia en su navegador y la reenvía al conectarse, así el ranking se reconstruye.
+const fs = require("fs"), ARCH = process.env.DATOS || "datos.json";
+let stats = {}, sucio = false;
+try { stats = JSON.parse(fs.readFileSync(ARCH, "utf8")); } catch (e) {}
+setInterval(() => { if (sucio) { sucio = false; try { fs.writeFileSync(ARCH, JSON.stringify(stats)); } catch (e) {} } }, 10000);
+const st = (k, n) => stats[k] = stats[k] || { nombre: n || "Jugador", copas: 0, torneos: 0, partidas: 0, parejas: 0 };
+function reg(j, d) {
+  if (!j || !j.pid) return;
+  const x = st(j.pid, j.nombre); x.nombre = j.nombre;
+  for (const k in d) x[k] += d[k];
+  sucio = true; if (j.sid) io.to(j.sid).emit("perfil", x);
+}
 const difundir = () => io.emit("online", { n: io.sockets.sockets.size, b: cola.length });
 
 function pub(s) {
@@ -43,7 +57,7 @@ function siguiente(s) {
   for (;;) {
     if (r.pend.length >= 2) { empezar(s, [r.pend.shift(), r.pend.shift()]); return emit(s); }
     if (r.pend.length === 1) r.gan.push(r.pend.shift());
-    if (r.gan.length === 1) { s.fase = "fin"; s.campeon = r.gan[0]; s.aviso = "🏆 Campeón: " + J(s, r.gan[0]).nombre; return emit(s); }
+    if (r.gan.length === 1) { s.fase = "fin"; s.campeon = r.gan[0]; reg(J(s, r.gan[0]), { torneos: 1 }); s.aviso = "🏆 Campeón: " + J(s, r.gan[0]).nombre; return emit(s); }
     r.pend = r.gan; r.gan = []; r.num++;
   }
 }
@@ -56,6 +70,7 @@ function finPartida(s) {
     return setTimeout(() => { if (s.fase === "pausa" && !p.decidida) { empezar(s, p.ids); emit(s); } }, 3000);
   }
   gan[0].victorias++; p.decidida = true;
+  js.forEach(j => reg(j, { partidas: 1, parejas: j.puntos, copas: j === gan[0] ? 1 : 0 }));
   if (s.modo === "libre") { s.fase = "fin"; s.campeon = gan[0].id; s.aviso = "🏆 Ganó " + gan[0].nombre; return emit(s); }
   p.ids.forEach(i => { if (i !== gan[0].id) J(s, i).elim = true; });
   s.ronda.gan.push(gan[0].id); s.aviso = gan[0].nombre + " avanza"; s.fase = "pausa"; emit(s);
@@ -68,7 +83,7 @@ io.on("connection", socket => {
   const sala = () => salas[cs];
   const entrar = (s, j) => { cs = s.codigo; yo = j.id; j.sid = socket.id; j.conectado = true; socket.join(s.codigo); clearTimeout(s.lim); };
   const nuevo = (s, id, nombre) => {
-    const j = { id, nombre: String(nombre || "").trim().slice(0, 16) || "Jugador", victorias: 0, puntos: 0, conectado: true,
+    const j = { id, pid: socket.data.pid, nombre: String(nombre || "").trim().slice(0, 16) || "Jugador", victorias: 0, puntos: 0, conectado: true,
       color: COL.find(c => !s.jugadores.some(x => x.color === c)) || COL[0] };
     s.jugadores.push(j); return j;
   };
@@ -128,6 +143,23 @@ io.on("connection", socket => {
     const s = sala(), j = s && J(s, yo);
     if (j) io.to(s.codigo).emit("chat", { n: j.nombre, c: j.color, t: String(t).slice(0, 120) });
   });
+  socket.on("perfil", ({ pid, nombre, stats: c } = {}) => {
+    const k = "p_" + String(pid || "").replace(/[^\w-]/g, "").slice(0, 48);
+    if (k === "p_") return;
+    socket.data.pid = k;
+    const x = st(k, nombre); if (nombre) x.nombre = String(nombre).slice(0, 16);
+    for (const f of ["copas", "torneos", "partidas", "parejas"]) {
+      const v = Number(c && c[f]);
+      if (v >= 0 && v < 1e5 && v > x[f]) { x[f] = Math.floor(v); sucio = true; }
+    }
+    socket.emit("perfil", x);
+  });
+  socket.on("ranking", (_, cb = () => {}) => {
+    const l = Object.entries(stats).filter(([, v]) => v.partidas > 0).map(([k, v]) => ({ k, ...v }))
+      .sort((a, b) => b.copas - a.copas || b.torneos - a.torneos || a.partidas - b.partidas);
+    const i = l.findIndex(x => x.k === socket.data.pid);
+    cb({ top: l.slice(0, 20).map(x => ({ n: x.nombre, c: x.copas, t: x.torneos, p: x.partidas, yo: x.k === socket.data.pid })), pos: i + 1, total: l.length });
+  });
   socket.on("salir", () => {
     const s = sala(), j = s && J(s, yo);
     if (!s || !j) return;
@@ -145,7 +177,7 @@ io.on("connection", socket => {
           let t = p.turno; if (p.ids.indexOf(id) < t) t--;
           p.ids = rest; p.turno = t >= rest.length ? 0 : t; reloj(s);
         } else {
-          const g = J(s, rest[0]); g.victorias++; p.decidida = true;
+          const g = J(s, rest[0]); g.victorias++; p.decidida = true; reg(g, { partidas: 1, copas: 1 }); reg(j, { partidas: 1 });
           if (s.modo === "libre") { s.fase = "fin"; s.campeon = g.id; s.aviso = "🏆 Ganó " + g.nombre + " (el rival salió)"; }
           else { s.ronda.gan.push(g.id); s.aviso = g.nombre + " avanza (el rival salió)"; s.fase = "pausa"; setTimeout(() => { if (s.fase === "pausa") siguiente(s); }, 3000); }
         }
@@ -166,7 +198,7 @@ io.on("connection", socket => {
     const [a, b] = cola.splice(0, 2), c = cod();
     const s = salas[c] = { codigo: c, host: null, modo: "libre", tam: 4, fase: "espera", auto: true, jugadores: [] };
     [a, b].forEach(x => {
-      const id = crypto.randomUUID(), j = nuevo(s, id, x.nombre); j.conectado = false;
+      const id = crypto.randomUUID(), j = nuevo(s, id, x.nombre); j.conectado = false; j.pid = x.socket.data.pid;
       if (!s.host) s.host = id;
       x.socket.emit("emparejado", { codigo: c, token: id });
     });
