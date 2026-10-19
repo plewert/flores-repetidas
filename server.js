@@ -51,6 +51,19 @@ function reg(j, d) {
 const hash = (c, sal) => crypto.scryptSync(c, sal, 32).toString("hex");
 const limpiarU = u => String(u || "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 16);
 const difundir = () => io.emit("online", { n: io.sockets.sockets.size, b: cola.length });
+const ESPERA_BOT = 6 * 60 * 1000; // 6 minutos
+setInterval(() => {
+  const ya = cola.filter(x => x.socket.connected && Date.now() - x.t >= ESPERA_BOT);
+  if (!ya.length) return;
+  cola = cola.filter(x => !ya.includes(x));
+  ya.forEach(x => {
+    const c = cod(), s = salas[c] = { codigo: c, host: null, modo: "libre", tam: 4, fase: "espera", auto: true, conBot: true, jugadores: [] };
+    const id = crypto.randomUUID(), j = x.nuevo(s, id, x.nombre); j.conectado = false; j.pid = x.socket.data.pid; j.av = x.socket.data.av || "🌸"; s.host = id;
+    s.jugadores.push({ id: "bot_" + c, av: "🤖", nombre: "Bot Difícil", color: COL.find(k => !s.jugadores.some(y => y.color === k)) || COL[1], victorias: 0, puntos: 0, conectado: true, bot: true });
+    x.socket.emit("emparejado", { codigo: c, token: id, bot: true });
+  });
+  difundir();
+}, 5000);
 
 function pub(s) {
   const p = s.partida;
@@ -67,6 +80,7 @@ const emit = s => io.to(s.codigo).emit("estado", pub(s));
 function avanzar(p) { p.turno = (p.turno + 1) % p.ids.length; if (p.cong && p.ids[p.turno] === p.cong) { p.cong = null; p.turno = (p.turno + 1) % p.ids.length; } }
 function reloj(s) {
   const p = s.partida; clearTimeout(p.t); p.limite = Date.now() + TURNO_MS;
+  { const tj = J(s, p.ids[p.turno]); if (tj && tj.bot) setTimeout(() => botMueve(s, p), 900); }
   p.t = setTimeout(() => {
     p.vol.forEach(i => p.cartas[i].e = "oculta"); p.vol = []; p.bloq = false;
     avanzar(p); reloj(s); emit(s);
@@ -86,6 +100,41 @@ function siguiente(s) {
     r.pend = r.gan; r.gan = []; r.num++;
   }
 }
+function voltear(s, id, i) {
+  const p = s && s.partida;
+  if (!p || s.fase !== "jugando" || p.bloq || p.ids[p.turno] !== id) return;
+  const c = p.cartas[i]; if (!c || c.e !== "oculta") return;
+  const mem = p.mem = p.mem || {};
+  c.e = "volteada"; p.vol.push(i); mem[i] = c.f; emit(s);
+  if (p.vol.length < 2) return;
+  clearTimeout(p.t);
+  const [a, b] = p.vol; p.vol = []; const A = p.cartas[a], B = p.cartas[b];
+  if (A.f === B.f) {
+    A.e = B.e = "emparejada"; delete mem[a]; delete mem[b];
+    const jj = J(s, id); jj.puntos++; jj.racha = (jj.racha || 0) + 1; if (jj.racha % 2 === 0) jj.pw = (jj.pw || 0) + 1;
+    io.to(s.codigo).emit("sonido", "ok"); emit(s);
+    p.cartas.every(x => x.e === "emparejada") ? finPartida(s) : reloj(s);
+  } else {
+    p.bloq = true; J(s, id).racha = 0; io.to(s.codigo).emit("sonido", "no");
+    setTimeout(() => { if (s.partida !== p || !p.bloq) return; A.e = B.e = "oculta"; p.bloq = false; avanzar(p); reloj(s); emit(s); }, FALLO_MS);
+  }
+}
+// Bot difícil del servidor: recuerda el 95 % de las cartas que se han visto
+function botMueve(s, p) {
+  const ok = () => salas[s.codigo] === s && s.partida === p && s.fase === "jugando" && !p.bloq;
+  if (!ok()) return;
+  const bot = J(s, p.ids[p.turno]); if (!bot || !bot.bot) return;
+  const lib = () => p.cartas.map((c, i) => c.e === "oculta" ? i : -1).filter(i => i >= 0), mem = p.mem = p.mem || {}, K = 0.95;
+  const par = (() => { const m = {}; for (const k in mem) { if (p.cartas[k].e !== "oculta") continue; const f = mem[k]; if (m[f] !== undefined) return [m[f], +k]; m[f] = +k; } })();
+  const l = lib(); if (!l.length) return;
+  const a = par && Math.random() < K ? par[0] : l[Math.random() * l.length | 0];
+  voltear(s, bot.id, a);
+  setTimeout(() => {
+    if (!ok() || p.ids[p.turno] !== bot.id) return;
+    const rs = lib(), k2 = Object.keys(mem).map(Number).find(x => x !== a && p.cartas[x].e === "oculta" && mem[x] === p.cartas[a].f);
+    voltear(s, bot.id, k2 !== undefined && Math.random() < K ? k2 : rs[Math.random() * rs.length | 0]);
+  }, 800);
+}
 function finPartida(s) {
   const p = s.partida; clearTimeout(p.t);
   const js = p.ids.map(i => J(s, i)), max = Math.max(...js.map(j => j.puntos)), gan = js.filter(j => j.puntos === max);
@@ -95,7 +144,7 @@ function finPartida(s) {
     return setTimeout(() => { if (s.fase === "pausa" && !p.decidida) { empezar(s, p.ids); emit(s); } }, 3000);
   }
   gan[0].victorias++; p.decidida = true;
-  js.forEach(j => reg(j, { partidas: 1, parejas: j.puntos, copas: j === gan[0] ? 1 : 0 }));
+  js.forEach(j => reg(j, { partidas: 1, parejas: j.puntos, copas: s.conBot ? 0 : (j === gan[0] ? 1 : 0) }));
   if (s.modo === "libre") { s.fase = "fin"; s.campeon = gan[0].id; s.aviso = "🏆 Ganó " + gan[0].nombre; return emit(s); }
   p.ids.forEach(i => { if (i !== gan[0].id) J(s, i).elim = true; });
   s.ronda.gan.push(gan[0].id); s.aviso = gan[0].nombre + " avanza"; s.fase = "pausa"; emit(s);
@@ -148,22 +197,7 @@ io.on("connection", socket => {
     else { s.ronda = { num: 1, pend: mez(act.map(j => j.id)), gan: [] }; siguiente(s); }
     cb({ ok: true });
   });
-  socket.on("voltear", ({ i } = {}) => {
-    const s = sala(), p = s && s.partida;
-    if (!p || s.fase !== "jugando" || p.bloq || p.ids[p.turno] !== yo) return;
-    const c = p.cartas[i]; if (!c || c.e !== "oculta") return;
-    c.e = "volteada"; p.vol.push(i); emit(s);
-    if (p.vol.length < 2) return;
-    clearTimeout(p.t);
-    const [a, b] = p.vol; p.vol = []; const A = p.cartas[a], B = p.cartas[b];
-    if (A.f === B.f) {
-      A.e = B.e = "emparejada"; const jj = J(s, yo); jj.puntos++; jj.racha = (jj.racha || 0) + 1; if (jj.racha % 2 === 0) jj.pw = (jj.pw || 0) + 1; io.to(s.codigo).emit("sonido", "ok"); emit(s);
-      p.cartas.every(x => x.e === "emparejada") ? finPartida(s) : reloj(s);
-    } else {
-      p.bloq = true; J(s, yo).racha = 0; io.to(s.codigo).emit("sonido", "no");
-      setTimeout(() => { if (s.partida !== p || !p.bloq) return; A.e = B.e = "oculta"; p.bloq = false; avanzar(p); reloj(s); emit(s); }, FALLO_MS);
-    }
-  });
+  socket.on("voltear", ({ i } = {}) => voltear(sala(), yo, i));
   socket.on("chat", t => {
     const s = sala(), j = s && J(s, yo);
     if (j) io.to(s.codigo).emit("chat", { n: j.nombre, c: j.color, t: String(t).slice(0, 120) });
@@ -277,13 +311,22 @@ io.on("connection", socket => {
         if (p) clearTimeout(p.t); s.fase = "fin"; s.campeon = act[0].id; s.aviso = "🏆 Ganó " + act[0].nombre + " (los demás salieron)";
       }
     }
-    if (!s.jugadores.some(x => !x.salio)) { if (s.partida) clearTimeout(s.partida.t); delete salas[s.codigo]; return; }
+    if (!s.jugadores.some(x => !x.salio && !x.bot)) { if (s.partida) clearTimeout(s.partida.t); delete salas[s.codigo]; return; }
     if (s.host === id) s.host = s.jugadores.find(x => !x.salio).id;
     emit(s);
   });
+  const PREMIO = { facil: 2, medio: 30, dificil: 90 };
+  socket.on("botIni", ({ n } = {}) => { socket.data.botIni = PREMIO[n] ? { n, t: Date.now() } : null; });
+  socket.on("botGane", ({ n } = {}, cb = () => {}) => {
+    const b = socket.data.botIni; socket.data.botIni = null;
+    if (!b || b.n !== n || !socket.data.pid) return cb({ ok: false });
+    if (Date.now() - b.t < 15000) return cb({ ok: false, error: "Partida demasiado rápida: sin premio" });
+    const x = st(socket.data.pid); x.bonus += PREMIO[n]; sucio = true;
+    socket.emit("perfil", x); cb({ ok: true, monedas: PREMIO[n] });
+  });
   socket.on("buscar", ({ nombre } = {}) => {
     cola = cola.filter(x => x.socket !== socket && x.socket.connected);
-    cola.push({ socket, nombre });
+    cola.push({ socket, nombre, t: Date.now(), nuevo });
     if (cola.length < 2) return difundir();
     const [a, b] = cola.splice(0, 2), c = cod();
     const s = salas[c] = { codigo: c, host: null, modo: "libre", tam: 4, fase: "espera", auto: true, jugadores: [] };
@@ -303,7 +346,7 @@ io.on("connection", socket => {
       s.jugadores = s.jugadores.filter(x => x !== j);
       if (s.host === yo && s.jugadores[0]) s.host = s.jugadores[0].id;
     } else j.conectado = false;
-    if (!s.jugadores.some(x => x.conectado)) s.lim = setTimeout(() => { if (s.partida) clearTimeout(s.partida.t); delete salas[s.codigo]; }, 600000);
+    if (!s.jugadores.some(x => x.conectado && !x.bot)) s.lim = setTimeout(() => { if (s.partida) clearTimeout(s.partida.t); delete salas[s.codigo]; }, 600000);
     else emit(s);
   });
 });
