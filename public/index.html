@@ -54,6 +54,15 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
 .rej{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .av{border:2px solid var(--rc);border-radius:8px;padding:6px 2px;text-align:center;font-size:1.8rem;opacity:.45;background:rgba(0,10,30,.6)}
 .av.on{opacity:1;cursor:pointer;box-shadow:0 0 10px var(--rc)}.av.eq{background:rgba(0,229,255,.22)}.av small{display:block;font-size:.6rem;color:var(--tx)}
+body[data-dorso=oro] .b{background:radial-gradient(circle,#ffe27a 0 6%,transparent 7%),repeating-linear-gradient(45deg,#7a5a00 0 6px,#b8860b 6px 12px);border-color:#ffe27a;box-shadow:0 0 10px rgba(255,210,63,.6)}
+body[data-dorso=rubi] .b{background:radial-gradient(circle,#fff 0 4%,transparent 5%),repeating-conic-gradient(#7a0a2a 0 15deg,#c2185b 15deg 30deg);border-color:#ff7aa8;box-shadow:0 0 10px rgba(255,60,120,.6)}
+body[data-dorso=galaxia] .b{background:radial-gradient(circle at 30% 30%,#fff 0 1%,transparent 2%),radial-gradient(circle at 70% 60%,#fff 0 1%,transparent 2%),radial-gradient(circle,#6a2cff,#0a0630);border-color:#b48cff;box-shadow:0 0 12px rgba(120,80,255,.7)}
+body[data-dorso=arco] .b{background:linear-gradient(135deg,#ff2bd6,#ffd23f,#39ff88,#00e5ff,#8f5ae0);border-color:#fff}
+body[data-marco=magenta] .tab{border-color:#ff2bd6;box-shadow:0 0 22px rgba(255,43,214,.5),inset 0 0 30px rgba(255,43,214,.1)}
+body[data-marco=dorado] .tab{border-color:#ffd23f;box-shadow:0 0 22px rgba(255,210,63,.55),inset 0 0 30px rgba(255,210,63,.1)}
+body[data-marco=verde] .tab{border-color:#39ff88;box-shadow:0 0 22px rgba(57,255,136,.5),inset 0 0 30px rgba(57,255,136,.1)}
+body[data-marco=fuego] .tab{border-color:#ff6a00;box-shadow:0 0 26px rgba(255,106,0,.65),inset 0 0 30px rgba(255,60,0,.15)}
+.c.esp .in{transform:rotateY(180deg)}#pwr{display:flex}#pwr button{margin:0}
 </style></head><body><main>
 <h1>🌸 Flores Repetidas</h1>
 <section id="inicio" class="p">
@@ -66,10 +75,18 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
  <button id="bBuscar">⚡ Buscar partida rápida (1 vs 1)</button><button id="bCancel" class="s oc">✖ Cancelar búsqueda</button>
  <button id="bRank" class="s">🏆 Ranking y logros</button>
  <button id="bTienda" class="s">🎁 Cofres y personajes</button>
+ <button id="bCuenta" class="s">🔐 Cuenta (guarda tu progreso)</button>
  <p class="c0">— o únete con un código —</p>
  <input id="cIn" placeholder="CÓDIGO" maxlength="4" style="text-transform:uppercase;text-align:center;letter-spacing:6px">
  <button id="bUnir" class="s">Unirse</button><div id="eI" class="er"></div>
  <p class="c0" style="font-size:.8rem;margin:0"><a href="/privacy.html" style="color:var(--su)">Política de privacidad</a></p>
+</section>
+<section id="cuenta" class="p oc">
+ <h3 style="margin-top:0">🔐 Mi cuenta</h3><div id="cInfo" class="c0" style="margin-bottom:10px"></div>
+ <input id="cU" placeholder="Usuario (3-16, letras y números)" maxlength="16" autocomplete="username">
+ <input id="cP" type="password" placeholder="Contraseña (mínimo 6)" autocomplete="current-password">
+ <button id="bLogin">Entrar</button><button id="bReg" class="s">Crear cuenta</button><button id="bLogout" class="s oc">Cerrar sesión</button>
+ <div id="cE" class="er"></div><button id="bVolver4" class="s">Volver</button>
 </section>
 <section id="solo" class="p oc">
  <select id="sBot"><option value="0">Entrenar (sin rival)</option><option value="0.4">Contra la PC: fácil</option><option value="0.7">Contra la PC: medio</option><option value="0.95">Contra la PC: difícil</option></select>
@@ -91,8 +108,9 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
 </section>
 <section id="rank" class="p oc">
  <h3 style="margin-top:0">Mi personaje</h3><div id="chs" class="gch"></div>
+ <h3>Dorsos de carta</h3><div id="dors" class="rej"></div><h3>Marcos del tablero</h3><div id="marc" class="rej"></div>
  <h3>Mi perfil</h3><div id="perf"></div><div id="logros"></div>
- <h3>🏆 Top 20 jugadores</h3><div id="top"></div>
+ <h3>🏆 Top 20 jugadores</h3><div id="rkNota" class="c0"></div><div id="top"></div>
  <button id="bVolver2" class="s" style="margin-top:10px">Volver</button>
 </section>
 <section id="espera" class="p oc">
@@ -107,7 +125,8 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
  <div id="hd" class="c0"></div><div id="mar" class="js"></div>
  <div id="bw"><div id="barra"></div></div>
  <div id="tab"></div><div id="msg" class="m"></div>
- <div id="fin" class="oc"><button id="bOtra">Jugar otra vez</button></div>
+ <div id="pwr" class="oc" style="gap:6px;margin:8px 0"><button id="pEsp" class="s">👁️ Espiar</button><button id="pCon" class="s">🧊 Congelar</button></div>
+ <div id="fin" class="oc"><button id="bOtra">🔁 Revancha / jugar otra vez</button></div>
  <div style="display:flex;gap:6px;margin:8px 0"><button class="s rx">😂</button><button class="s rx">👏</button><button class="s rx">😱</button><button class="s rx">🔥</button></div>
  <button id="bSalir" class="s">⬅ Salir de la partida</button>
  <div class="p" style="margin-top:10px"><div id="log"></div><input id="ch" placeholder="Escribe y pulsa Enter" maxlength="120" style="margin:0"></div>
@@ -118,8 +137,8 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
 const $=id=>document.getElementById(id),FL=["🌹","🌻","🌷","🌸","🌼","🌺","💐","🪻","🪷","🏵️","🌿","🍀","🌵","🌴","🌱","🍁","🍄","🌾"];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const mez=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
-const nom=()=>{const n=$("nombre").value.trim()||"Jugador";try{localStorage.setItem("fr-nombre",n)}catch(e){}return n},ver=id=>["inicio","solo","espera","juego","rank","tienda"].forEach(x=>$(x).classList.toggle("oc",x!==id));
-let ac,MUTE=false;function son(t){if(MUTE)return;try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain(),f={ok:[660,880],no:[220,160],fin:[523,784,1046]}[t];o.connect(g);g.connect(ac.destination);f.forEach((x,i)=>o.frequency.setValueAtTime(x,ac.currentTime+i*.12));g.gain.value=.08;o.start();o.stop(ac.currentTime+f.length*.12+.05)}catch(e){}}
+const nom=()=>{const n=$("nombre").value.trim()||"Jugador";try{localStorage.setItem("fr-nombre",n)}catch(e){}return n},ver=id=>["inicio","solo","espera","juego","rank","tienda","cuenta"].forEach(x=>$(x).classList.toggle("oc",x!==id));
+let ac,MUTE=false;function son(t){if(MUTE)return;try{navigator.vibrate&&navigator.vibrate(t==="ok"?40:t==="no"?[20,40,20]:[80,40,80])}catch(e){}try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain(),f={ok:[660,880],no:[220,160],fin:[523,784,1046]}[t];o.connect(g);g.connect(ac.destination);f.forEach((x,i)=>o.frequency.setValueAtTime(x,ac.currentTime+i*.12));g.gain.value=.08;o.start();o.stop(ac.currentTime+f.length*.12+.05)}catch(e){}}
 function tab(el,cs,tam,fn){
  if(el.dataset.n!=cs.length+"-"+tam){el.dataset.n=cs.length+"-"+tam;el.className="tab t"+tam;el.style.gridTemplateColumns=`repeat(${tam},1fr)`;
   el.innerHTML=cs.map(()=>'<div class="c"><div class="in"><div class="f b"></div><div class="f a"></div></div></div>').join("")}
@@ -159,9 +178,9 @@ const RN=["común","raro","épico","legendario"],RCF=["#8aa0b4","#3a8fe0","#b44a
 const saldo=()=>PF.copas*10+PF.torneos*25+PF.partidas*2+PF.parejas+PF.bonus-PF.gastado;
 const LOG=[["🥇","Primera victoria",p=>p.copas>=1],["🎮","Constante: 10 partidas",p=>p.partidas>=10],["🏆","Diez copas",p=>p.copas>=10],["👑","Campeón de torneo",p=>p.torneos>=1],["🌸","Coleccionista: 100 parejas",p=>p.parejas>=100],["🛡️","Veterano: 50 partidas",p=>p.partidas>=50],["💎","Leyenda: 50 copas",p=>p.copas>=50]];
 const CH=[["🌸","Florecita","común","Gratis",p=>true],["🐝","Abeja Obrera","común","Gratis",p=>true],["🐞","Mariquita","común","Gratis",p=>true],
-["🦋","Mariposa Real","raro","40 copas",p=>p.copas>=40],["🦊","Zorro Astuto","raro","70 partidas",p=>p.partidas>=70],["🐢","Tortuga Sabia","raro","60 parejas",p=>p.parejas>=60],
-["🧚","Hada de las Flores","épico","120 copas",p=>p.copas>=120],["🦉","Búho Estratega","épico","180 partidas",p=>p.partidas>=180],["🦚","Pavo Real","épico","1 torneo",p=>p.torneos>=1],
-["🐉","Dragón Jardinero","legendario","250 copas",p=>p.copas>=250],["🦄","Unicornio Floral","legendario","3 torneos",p=>p.torneos>=3],["🧙","Archimago Botánico","legendario","50 copas",p=>p.copas>=50],["🔥","Fénix Eterno","legendario","5 torneos",p=>p.torneos>=5]];
+["🦋","Mariposa Real","raro","3 copas",p=>p.copas>=3],["🦊","Zorro Astuto","raro","15 partidas",p=>p.partidas>=15],["🐢","Tortuga Sabia","raro","60 parejas",p=>p.parejas>=60],
+["🧚","Hada de las Flores","épico","10 copas",p=>p.copas>=10],["🦉","Búho Estratega","épico","40 partidas",p=>p.partidas>=40],["🦚","Pavo Real","épico","1 torneo",p=>p.torneos>=1],
+["🐉","Dragón Jardinero","legendario","25 copas",p=>p.copas>=25],["🦄","Unicornio Floral","legendario","3 torneos",p=>p.torneos>=3],["🧙","Archimago Botánico","legendario","50 copas",p=>p.copas>=50],["🔥","Fénix Eterno","legendario","5 torneos",p=>p.torneos>=5]];
 const RC={"común":"#8aa0b4","raro":"#3a8fe0","épico":"#b44aff","legendario":"#ffc933"};
 let AV=(()=>{try{return localStorage.getItem("fr-av")}catch(e){return null}})()||"🌸";
 function drawCH(){$("chs").innerHTML=CH.map(c=>{const ok=c[4](PF);return `<div class="ch${ok?"":" bl"}${c[0]===AV?" sel":""}${c[2]==="legendario"?" leg":""}" data-a="${c[0]}" style="border-color:${RC[c[2]]}"><b>${ok?c[0]:"🔒"}</b>${c[1]}<br><span style="color:${RC[c[2]]}">${c[2]}</span>${ok?"":"<br>"+c[3]}</div>`}).join("");
@@ -179,17 +198,17 @@ $("bCofre").onclick=()=>{$("bCofre").disabled=true;$("rev").innerHTML='<div clas
 const toast=t=>{const d=document.createElement("div");d.className="toast";d.textContent=t;d.style.top=(14+document.querySelectorAll(".toast").length*46)+"px";document.body.appendChild(d);setTimeout(()=>d.remove(),4500)};
 const resumen=()=>{$("miP").textContent=`${AV} 🏆 ${PF.copas} copas · 👑 ${PF.torneos} torneos · 🎮 ${PF.partidas} partidas · 🪙 ${saldo()}`};resumen();
 socket.on("perfil",x=>{const antes=LOG.filter(l=>l[2](PF)).map(l=>l[1]).concat(CH.filter(c=>c[4](PF)).map(c=>c[1]));PF={copas:x.copas,torneos:x.torneos,partidas:x.partidas,parejas:x.parejas,gastado:x.gastado||0,bonus:x.bonus||0,items:x.items||[]};
- try{localStorage.setItem("fr-perfil",JSON.stringify(PF))}catch(e){}resumen();if(!$("tienda").classList.contains("oc"))verTienda();
+ if(!USR&&!TK)try{localStorage.setItem("fr-perfil",JSON.stringify(PF))}catch(e){}resumen();if(!$("tienda").classList.contains("oc"))verTienda();
  LOG.filter(l=>l[2](PF)&&!antes.includes(l[1])).forEach(l=>toast(`${l[0]} Logro desbloqueado: ${l[1]}`));
  CH.filter(c=>c[4](PF)&&!antes.includes(c[1])).forEach(c=>toast(`${c[0]} ¡Personaje desbloqueado: ${c[1]} (${c[2]})!`))});
-function verRank(){drawCH();
+function verRank(){drawCH();drawCos();$("rkNota").textContent=USR?"":"🔐 Crea una cuenta para aparecer en el ranking.";
  $("perf").innerHTML=`<div class="c0">🏆 <b>${PF.copas}</b> copas · 👑 <b>${PF.torneos}</b> torneos · 🎮 ${PF.partidas} partidas · 🌸 ${PF.parejas} parejas</div>`;
  $("logros").innerHTML=LOG.map(l=>{const ok=l[2](PF);return `<div style="opacity:${ok?1:.4}">${ok?l[0]:"🔒"} ${l[1]}</div>`}).join("");
  $("top").textContent="Cargando…";
  socket.emit("ranking",null,r=>{$("top").innerHTML=r.top.length?r.top.map((x,i)=>`<div class="fila${x.yo?" yo":""}"><span>${["🥇","🥈","🥉"][i]||(i+1)+"."} ${x.a||""} ${esc(x.n)}</span><span>🏆${x.c} · 👑${x.t}</span></div>`).join("")+(r.pos>20?`<div class="c0">Tu posición: #${r.pos} de ${r.total}</div>`:""):"Aún no hay partidas jugadas."})}
 $("bRank").onclick=()=>{ver("rank");verRank()};$("bVolver2").onclick=()=>ver("inicio");
 const guardar=(c,t)=>{miId=t;try{localStorage.setItem("fr-sesion",JSON.stringify({codigo:c,token:t}))}catch(e){}};
-socket.on("connect",()=>{socket.emit("perfil",{pid,nombre:nmG(),stats:PF,av:AV});const s=sv();if(s)socket.emit("reconectar",s,r=>{if(r.ok)miId=s.token;else try{localStorage.removeItem("fr-sesion")}catch(e){}})});
+socket.on("connect",()=>{socket.emit("perfil",{pid,nombre:nmG(),stats:PF,av:AV});if(TK)socket.emit("sesion",{token:TK},r=>{if(r.ok){USR=r.usuario;pCta()}else{TK=null;try{localStorage.removeItem("fr-tk")}catch(e){}}});const s=sv();if(s)socket.emit("reconectar",s,r=>{if(r.ok)miId=s.token;else try{localStorage.removeItem("fr-sesion")}catch(e){}})});
 const crear=modo=>socket.emit("crearSala",{nombre:nom(),modo,tam:4},r=>{if(r.ok)guardar(r.codigo,r.token)});
 $("bLibre").onclick=()=>crear("libre");$("bTorneo").onclick=()=>crear("torneo");
 const busc=on=>{$("bBuscar").classList.toggle("oc",on);$("bCancel").classList.toggle("oc",!on);$("eI").textContent=on?"🔎 Buscando rival… (no cierres la página)":""};
@@ -207,6 +226,27 @@ document.querySelectorAll(".rx").forEach(b=>b.onclick=()=>socket.emit("reaccion"
 socket.on("reaccion",m=>{const d=document.createElement("div");d.className="cf rxf";d.textContent=m.e+" "+m.n;d.style.left=(10+Math.random()*70)+"vw";document.body.appendChild(d);setTimeout(()=>d.remove(),2500)});
 $("bCopiar").onclick=()=>{try{navigator.clipboard.writeText(location.origin+"/?sala="+E.codigo).then(()=>toast("📋 Enlace copiado"))}catch(e){toast("Código: "+E.codigo)}};
 $("bMute").onclick=()=>{MUTE=!MUTE;$("bMute").textContent=MUTE?"🔇":"🔊"};
+// ---- poderes ----
+$("pEsp").onclick=()=>socket.emit("poder","espiar");$("pCon").onclick=()=>socket.emit("poder","congelar");
+socket.on("espia",({i,f})=>{const d=$("tab").children[i];if(!d)return;d.querySelector(".a").textContent=f;d.classList.add("esp");setTimeout(()=>d.classList.remove("esp"),1600)});
+socket.on("aviso",t=>toast(t));
+// ---- cosméticos (se desbloquean con copas, torneos y partidas) ----
+const DO=[["neon","Neón","Gratis",p=>true,"🟦"],["oro","Oro","3 copas",p=>p.copas>=3,"🟨"],["rubi","Rubí","10 copas",p=>p.copas>=10,"🟥"],["galaxia","Galaxia","25 copas",p=>p.copas>=25,"🌌"],["arco","Arcoíris","1 torneo",p=>p.torneos>=1,"🌈"]];
+const MA=[["cian","Cian","Gratis",p=>true,"🔷"],["magenta","Magenta","5 copas",p=>p.copas>=5,"🟣"],["dorado","Dorado","15 copas",p=>p.copas>=15,"🟡"],["verde","Esmeralda","20 partidas",p=>p.partidas>=20,"🟢"],["fuego","Fuego","3 torneos",p=>p.torneos>=3,"🔥"]];
+let COS=(()=>{try{return JSON.parse(localStorage.getItem("fr-cos"))}catch(e){return null}})()||{d:"neon",m:"cian"};
+const aplCos=()=>{document.body.dataset.dorso=COS.d;document.body.dataset.marco=COS.m};aplCos();
+function drawCos(){[["dors",DO,"d"],["marc",MA,"m"]].forEach(([el,L,k])=>{
+ $(el).innerHTML=L.map(c=>{const ok=c[3](PF);return `<div class="av${ok?" on":""}${COS[k]===c[0]?" eq":""}" data-c="${c[0]}">${ok?c[4]:"🔒"}<small>${c[1]}${ok?"":"<br>"+c[2]}</small></div>`}).join("");
+ $(el).querySelectorAll(".on").forEach(d=>d.onclick=()=>{COS[k]=d.dataset.c;try{localStorage.setItem("fr-cos",JSON.stringify(COS))}catch(e){}aplCos();drawCos()})})}
+// ---- cuenta ----
+let TK=(()=>{try{return localStorage.getItem("fr-tk")}catch(e){return null}})(),USR=null;
+const pCta=()=>{$("cInfo").textContent=USR?`✅ Sesión iniciada como ${USR}. Tu progreso y tu lugar en el ranking se guardan en la cuenta.`:"Sin cuenta juegas como invitado y no apareces en el ranking.";
+ ["bLogin","bReg","cU","cP"].forEach(i=>$(i).classList.toggle("oc",!!USR));$("bLogout").classList.toggle("oc",!USR);$("bCuenta").textContent=USR?`👤 ${USR} · Mi cuenta`:"🔐 Cuenta (guarda tu progreso)"};
+const rCta=r=>{if(!r.ok){$("cE").textContent=r.error||"Error";return}TK=r.token;USR=r.usuario;try{localStorage.setItem("fr-tk",TK)}catch(e){}$("cE").textContent="";$("cP").value="";pCta()};
+$("bCuenta").onclick=()=>{ver("cuenta");pCta()};$("bVolver4").onclick=()=>ver("inicio");
+$("bLogin").onclick=()=>socket.emit("login",{usuario:$("cU").value,clave:$("cP").value},rCta);
+$("bReg").onclick=()=>socket.emit("registro",{usuario:$("cU").value,clave:$("cP").value,nombre:nmG()},rCta);
+$("bLogout").onclick=()=>{socket.emit("logout",{token:TK},()=>{});try{localStorage.removeItem("fr-tk");localStorage.removeItem("fr-perfil")}catch(e){}location.reload()};
 const ps=new URLSearchParams(location.search).get("sala");if(ps)$("cIn").value=ps.toUpperCase().slice(0,4);
 socket.on("chat",m=>{$("log").insertAdjacentHTML("beforeend",`<div><b style="color:${m.c}">${esc(m.n)}:</b> ${esc(m.t)}</div>`);$("log").scrollTop=1e9});
 socket.on("sonido",son);
@@ -221,8 +261,10 @@ function pintar(){const e=E,soyH=e.host===miId;
  $("mar").innerHTML=e.jugadores.map(j=>chip(j,e)).join("");
  const mi=e.turno===miId&&e.fase==="jugando",q=e.jugadores.find(j=>j.id===e.turno);
  tab($("tab"),e.cartas,e.tam,i=>{if(mi)socket.emit("voltear",{i})});
+ {const me=e.jugadores.find(j=>j.id===miId),jg=e.fase==="jugando"&&e.juegan.includes(miId);$("pwr").classList.toggle("oc",!jg);
+  $("pEsp").textContent=`👁️ Espiar (${me?me.pw:0})`;$("pCon").textContent=`🧊 Congelar (${me?me.pw:0})`;$("pEsp").disabled=$("pCon").disabled=!(mi&&me&&me.pw>0)}
  $("msg").textContent=e.aviso||(e.fase==="jugando"?(mi?"👉 ¡Es tu turno!":e.juegan.includes(miId)||e.modo==="libre"?`Turno de ${q?q.nombre:"…"}`:`👀 Mirando · turno de ${q?q.nombre:"…"}`):"");
- $("fin").classList.toggle("oc",!(e.fase==="fin"&&soyH))}
+ $("fin").classList.toggle("oc",e.fase!=="fin")}
 setInterval(()=>{$("barra").style.width=E&&E.fase==="jugando"?Math.max(0,(lim-Date.now())/200)+"%":"0"},200);
 if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
 </script></body></html>
