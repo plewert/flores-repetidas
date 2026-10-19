@@ -89,7 +89,7 @@ body[data-marco=fuego] .tab{border-color:#ff6a00;box-shadow:0 0 26px rgba(255,10
  <div id="cE" class="er"></div><button id="bVolver4" class="s">Volver</button>
 </section>
 <section id="solo" class="p oc">
- <select id="sBot"><option value="0">Entrenar (sin rival)</option><option value="0.4">Contra la PC: fácil</option><option value="0.7">Contra la PC: medio</option><option value="0.95">Contra la PC: difícil</option></select>
+ <select id="sBot"><option value="0">Entrenar (sin rival)</option><option value="0.4">Contra la PC: fácil (gana 2 🪙)</option><option value="0.7">Contra la PC: medio (gana 30 🪙)</option><option value="0.95">Contra la PC: difícil (gana 90 🪙)</option></select>
  <select id="sTam"><option value="4">Tablero 4x4</option><option value="6">Tablero 6x6</option></select>
  <select id="sDif"><option value="1500">Fácil (cartas visibles 1.5s)</option><option value="700">Difícil (0.7s)</option></select>
  <button id="bNueva">Nueva partida</button>
@@ -146,8 +146,9 @@ function tab(el,cs,tam,fn){
 // ---------- SOLO ----------
 let S;const rk=()=>"fr-"+S.tam+"-"+S.ms,mejor=()=>{try{return localStorage.getItem(rk())}catch(e){return null}};
 $("bSolo").onclick=()=>{ver("solo");nueva()};$("bVolver1").onclick=()=>ver("inicio");$("bNueva").onclick=nueva;
+const NV={0.4:"facil",0.7:"medio",0.95:"dificil"};
 function nueva(){const tam=+$("sTam").value,fl=mez([...FL]).slice(0,tam*tam/2);
- S={tam,ms:+$("sDif").value,bot:+$("sBot").value,tn:0,pts:[0,0],mem:{},cs:mez([...fl,...fl]).map(f=>({f,e:"oculta"})),vol:[],bloq:false,mov:0,par:0,t0:0};$("sRes").textContent="";pS()}
+ S={tam,ms:+$("sDif").value,bot:+$("sBot").value,tn:0,pts:[0,0],mem:{},cs:mez([...fl,...fl]).map(f=>({f,e:"oculta"})),vol:[],bloq:false,mov:0,par:0,t0:0};$("sRes").textContent="";if(S.bot)socket.emit("botIni",{n:NV[S.bot]});pS()}
 function pS(){tab($("tabS"),S.cs,S.tam,clicS);$("sInfo").textContent=S.bot?`Tú ${S.pts[0]} – PC ${S.pts[1]} · Turno: ${S.tn?"🤖 PC":"👉 Tú"}`:`Movimientos: ${S.mov} · Parejas: ${S.par}/${S.cs.length/2}`+(mejor()?` · Récord: ${mejor()}`:"")}
 function clicS(i){if(S.bloq||S.tn)return;jugS(i)}
 function jugS(i){if(!S.t0)S.t0=Date.now();const c=S.cs[i];c.e="volteada";S.mem[i]=c.f;S.vol.push(i);if(S.vol.length<2)return pS();
@@ -164,7 +165,7 @@ function botS(){if(S.tn!==1||S.bloq)return;const h=S.cs.map((c,i)=>i).filter(i=>
   if(k===null){const u=h.filter(i=>i!==S.vol[0]&&!(i in S.mem)),z=u.length?u:h.filter(i=>i!==S.vol[0]);k=z[Math.random()*z.length|0]}
   jugS(k)}}
 function finS(){son("fin");
- if(S.bot){const[a,b]=S.pts;if(a>b)confeti();$("sRes").textContent=a>b?`🏆 ¡Ganaste ${a}–${b}!`:a<b?`🤖 Ganó la PC ${b}–${a}`:`🤝 Empate ${a}–${b}`;return}
+ if(S.bot){const[a,b]=S.pts;if(a>b){confeti();socket.emit("botGane",{n:NV[S.bot]},r=>{if(r&&r.ok)toast(`🪙 +${r.monedas} monedas por ganarle a la PC`);else if(r&&r.error)toast(r.error)})}$("sRes").textContent=a>b?`🏆 ¡Ganaste ${a}–${b}!`:a<b?`🤖 Ganó la PC ${b}–${a}`:`🤝 Empate ${a}–${b}`;return}
  let ex="";try{const r=mejor();if(!r||S.mov<+r){localStorage.setItem(rk(),S.mov);ex=" · ¡Nuevo récord!"}}catch(e){}
  confeti();$("sRes").textContent=`🏆 ¡Listo! ${S.mov} movimientos en ${Math.round((Date.now()-S.t0)/1000)}s`+ex}
 // ---------- ONLINE ----------
@@ -211,9 +212,9 @@ const guardar=(c,t)=>{miId=t;try{localStorage.setItem("fr-sesion",JSON.stringify
 socket.on("connect",()=>{socket.emit("perfil",{pid,nombre:nmG(),stats:PF,av:AV});if(TK)socket.emit("sesion",{token:TK},r=>{if(r.ok){USR=r.usuario;pCta()}else{TK=null;try{localStorage.removeItem("fr-tk")}catch(e){}}});const s=sv();if(s)socket.emit("reconectar",s,r=>{if(r.ok)miId=s.token;else try{localStorage.removeItem("fr-sesion")}catch(e){}})});
 const crear=modo=>socket.emit("crearSala",{nombre:nom(),modo,tam:4},r=>{if(r.ok)guardar(r.codigo,r.token)});
 $("bLibre").onclick=()=>crear("libre");$("bTorneo").onclick=()=>crear("torneo");
-const busc=on=>{$("bBuscar").classList.toggle("oc",on);$("bCancel").classList.toggle("oc",!on);$("eI").textContent=on?"🔎 Buscando rival… (no cierres la página)":""};
+const busc=on=>{$("bBuscar").classList.toggle("oc",on);$("bCancel").classList.toggle("oc",!on);$("eI").textContent=on?"🔎 Buscando rival… Si en 6 minutos no hay nadie, jugarás contra un Bot Difícil (no cierres la página)":""};
 $("bBuscar").onclick=()=>{socket.emit("buscar",{nombre:nom()});busc(true)};$("bCancel").onclick=()=>{socket.emit("cancelar");busc(false)};
-socket.on("emparejado",r=>{busc(false);guardar(r.codigo,r.token);socket.emit("reconectar",{codigo:r.codigo,token:r.token},()=>{})});
+socket.on("emparejado",r=>{busc(false);if(r.bot)toast("🤖 No había rivales: jugarás contra el Bot Difícil");guardar(r.codigo,r.token);socket.emit("reconectar",{codigo:r.codigo,token:r.token},()=>{})});
 $("bUnir").onclick=()=>socket.emit("unirseSala",{codigo:$("cIn").value,nombre:nom()},r=>r.ok?guardar(r.codigo,r.token):$("eI").textContent=r.error);
 $("bIni").onclick=$("bOtra").onclick=()=>socket.emit("iniciar",null,r=>$("eE").textContent=r.ok?"":r.error||"");
 $("cModo").onchange=()=>socket.emit("config",{modo:$("cModo").value});$("cTam").onchange=()=>socket.emit("config",{tam:+$("cTam").value});
