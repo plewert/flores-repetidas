@@ -16,9 +16,21 @@ let cola = []; // jugadores buscando partida rápida
 // Se guardan en datos.json. En Render gratis el disco se borra al reiniciar, pero cada jugador
 // guarda su copia en su navegador y la reenvía al conectarse, así el ranking se reconstruye.
 const fs = require("fs"), ARCH = process.env.DATOS || "datos.json";
-let stats = {}, sucio = false;
-try { stats = JSON.parse(fs.readFileSync(ARCH, "utf8")); } catch (e) {}
-setInterval(() => { if (sucio) { sucio = false; try { fs.writeFileSync(ARCH, JSON.stringify(stats)); } catch (e) {} } }, 10000);
+let stats = {}, cuentas = {}, tokens = {}, sucio = false, pool = null;
+// Si defines DATABASE_URL (PostgreSQL gratis en Neon/Supabase) los datos viven en la base y no se borran nunca.
+if (process.env.DATABASE_URL) { try { const { Pool } = require("pg"); pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }); } catch (e) { console.log("Falta instalar pg: npm install pg"); } }
+async function cargar() {
+  try {
+    let d;
+    if (pool) { await pool.query("create table if not exists kv(k text primary key, v jsonb)"); const q = await pool.query("select v from kv where k='datos'"); d = q.rows[0] && q.rows[0].v; }
+    else d = JSON.parse(fs.readFileSync(ARCH, "utf8"));
+    if (d) { if (d.stats || d.cuentas) { stats = d.stats || {}; cuentas = d.cuentas || {}; tokens = d.tokens || {}; } else stats = d; }
+  } catch (e) {}
+}
+setInterval(async () => {
+  if (!sucio) return; sucio = false; const d = { stats, cuentas, tokens };
+  try { if (pool) await pool.query("insert into kv(k,v) values('datos',$1) on conflict(k) do update set v=$1", [JSON.stringify(d)]); else fs.writeFileSync(ARCH, JSON.stringify(d)); } catch (e) { sucio = true; }
+}, 8000);
 const AVS = new Set(["🌸","🐝","🐞","🦋","🦊","🐢","🧚","🦉","🦚","🐉","🦄","🧙","🔥"]);
 // personajes que solo salen en cofres (mismo orden y rareza que en el cliente)
 const CF = ["🐱","🐶","🐸","🐼","🐵","🥷","🤖","🦅","🐺","👽","🐲","🦖","🧞","🧜"], RARCF = [0,0,0,0,0,1,1,1,1,2,2,2,3,3], CFS = new Set(CF), COFRE = 50;
@@ -36,6 +48,8 @@ function reg(j, d) {
   for (const k in d) x[k] += d[k];
   sucio = true; if (j.sid) io.to(j.sid).emit("perfil", x);
 }
+const hash = (c, sal) => crypto.scryptSync(c, sal, 32).toString("hex");
+const limpiarU = u => String(u || "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 16);
 const difundir = () => io.emit("online", { n: io.sockets.sockets.size, b: cola.length });
 
 function pub(s) {
@@ -43,24 +57,25 @@ function pub(s) {
   return {
     codigo: s.codigo, host: s.host, modo: s.modo, tam: s.tam, fase: s.fase, ronda: s.ronda ? s.ronda.num : 0,
     campeon: s.campeon || null, aviso: s.aviso || "",
-    jugadores: s.jugadores.map(j => ({ id: j.id, av: j.av, nombre: j.nombre, color: j.color, victorias: j.victorias, puntos: j.puntos, conectado: j.conectado, elim: !!j.elim })),
+    jugadores: s.jugadores.map(j => ({ id: j.id, av: j.av, nombre: j.nombre, color: j.color, victorias: j.victorias, puntos: j.puntos, conectado: j.conectado, elim: !!j.elim, pw: j.pw || 0 })),
     juegan: p ? p.ids : [], turno: p ? p.ids[p.turno] : null, rest: p ? Math.max(0, p.limite - Date.now()) : 0,
     cartas: p ? p.cartas.map(c => ({ e: c.e, f: c.e === "oculta" ? null : c.f })) : []
   };
 }
 const emit = s => io.to(s.codigo).emit("estado", pub(s));
 
+function avanzar(p) { p.turno = (p.turno + 1) % p.ids.length; if (p.cong && p.ids[p.turno] === p.cong) { p.cong = null; p.turno = (p.turno + 1) % p.ids.length; } }
 function reloj(s) {
   const p = s.partida; clearTimeout(p.t); p.limite = Date.now() + TURNO_MS;
   p.t = setTimeout(() => {
     p.vol.forEach(i => p.cartas[i].e = "oculta"); p.vol = []; p.bloq = false;
-    p.turno = (p.turno + 1) % p.ids.length; reloj(s); emit(s);
+    avanzar(p); reloj(s); emit(s);
   }, TURNO_MS);
 }
 function empezar(s, ids) {
   const fl = mez([...F]).slice(0, s.tam * s.tam / 2);
   s.partida = { ids, cartas: mez([...fl, ...fl]).map(f => ({ f, e: "oculta" })), turno: 0, vol: [], bloq: false, limite: 0 };
-  ids.forEach(i => J(s, i).puntos = 0); s.fase = "jugando"; s.aviso = ""; reloj(s);
+  ids.forEach(i => { const j = J(s, i); j.puntos = 0; j.pw = 1; j.racha = 0; }); s.fase = "jugando"; s.aviso = ""; reloj(s);
 }
 function siguiente(s) {
   const r = s.ronda;
@@ -124,7 +139,7 @@ io.on("connection", socket => {
     emit(s);
   });
   socket.on("iniciar", (_, cb = () => {}) => {
-    const s = sala(); if (!s || s.host !== yo || !["espera", "fin"].includes(s.fase)) return cb({ ok: false });
+    const s = sala(); if (!s || (s.host !== yo && s.fase !== "fin") || !["espera", "fin"].includes(s.fase)) return cb({ ok: false });
     const act = s.jugadores.filter(j => j.conectado);
     if (act.length < 2) return cb({ ok: false, error: "Se necesitan al menos 2 jugadores" });
     if (s.modo === "libre" && act.length > 4) return cb({ ok: false, error: "Máximo 4 en partida libre" });
@@ -142,11 +157,11 @@ io.on("connection", socket => {
     clearTimeout(p.t);
     const [a, b] = p.vol; p.vol = []; const A = p.cartas[a], B = p.cartas[b];
     if (A.f === B.f) {
-      A.e = B.e = "emparejada"; J(s, yo).puntos++; io.to(s.codigo).emit("sonido", "ok"); emit(s);
+      A.e = B.e = "emparejada"; const jj = J(s, yo); jj.puntos++; jj.racha = (jj.racha || 0) + 1; if (jj.racha % 2 === 0) jj.pw = (jj.pw || 0) + 1; io.to(s.codigo).emit("sonido", "ok"); emit(s);
       p.cartas.every(x => x.e === "emparejada") ? finPartida(s) : reloj(s);
     } else {
-      p.bloq = true; io.to(s.codigo).emit("sonido", "no");
-      setTimeout(() => { if (s.partida !== p || !p.bloq) return; A.e = B.e = "oculta"; p.bloq = false; p.turno = (p.turno + 1) % p.ids.length; reloj(s); emit(s); }, FALLO_MS);
+      p.bloq = true; J(s, yo).racha = 0; io.to(s.codigo).emit("sonido", "no");
+      setTimeout(() => { if (s.partida !== p || !p.bloq) return; A.e = B.e = "oculta"; p.bloq = false; avanzar(p); reloj(s); emit(s); }, FALLO_MS);
     }
   });
   socket.on("chat", t => {
@@ -154,15 +169,15 @@ io.on("connection", socket => {
     if (j) io.to(s.codigo).emit("chat", { n: j.nombre, c: j.color, t: String(t).slice(0, 120) });
   });
   socket.on("perfil", ({ pid, nombre, stats: c, av } = {}) => {
-    const k = "p_" + String(pid || "").replace(/[^\w-]/g, "").slice(0, 48);
+    const k = socket.data.cuenta ? socket.data.pid : "p_" + String(pid || "").replace(/[^\w-]/g, "").slice(0, 48);
     if (k === "p_") return;
-    socket.data.pid = k;
+    socket.data.pid = k; const cta = !!socket.data.cuenta;
     const x = st(k, nombre); if (nombre) x.nombre = String(nombre).slice(0, 16);
     for (const f of ["copas", "torneos", "partidas", "parejas", "gastado", "bonus"]) {
-      const v = Number(c && c[f]);
+      const v = cta ? 0 : Number(c && c[f]);
       if (v >= 0 && v < 1e5 && v > x[f]) { x[f] = Math.floor(v); sucio = true; }
     }
-    if (c && Array.isArray(c.items)) c.items.forEach(i => { if (CFS.has(i) && !x.items.includes(i)) { x.items.push(i); sucio = true; } });
+    if (!cta && c && Array.isArray(c.items)) c.items.forEach(i => { if (CFS.has(i) && !x.items.includes(i)) { x.items.push(i); sucio = true; } });
     if (AVS.has(av) && (!CFS.has(av) || x.items.includes(av))) {
       socket.data.av = av; x.av = av; sucio = true;
       const s = sala(), j = s && J(s, yo);
@@ -181,15 +196,59 @@ io.on("connection", socket => {
     if (dup) x.bonus += 25; else x.items.push(a);
     sucio = true; socket.emit("perfil", x); cb({ ok: true, a, dup });
   });
+  socket.on("poder", tipo => {
+    const s = sala(), p = s && s.partida, j = s && J(s, yo);
+    if (!p || s.fase !== "jugando" || p.bloq || p.vol.length || p.ids[p.turno] !== yo || !(j.pw > 0)) return;
+    if (tipo === "espiar") {
+      const h = p.cartas.map((c, i) => c.e === "oculta" ? i : -1).filter(i => i >= 0);
+      if (!h.length) return;
+      const i = h[Math.random() * h.length | 0]; j.pw--; socket.emit("espia", { i, f: p.cartas[i].f });
+    } else if (tipo === "congelar") {
+      if (p.cong) return;
+      j.pw--; p.cong = p.ids[(p.turno + 1) % p.ids.length];
+      io.to(s.codigo).emit("aviso", "🧊 " + j.nombre + " congeló a " + J(s, p.cong).nombre);
+    } else return;
+    emit(s);
+  });
+  let intentos = 0;
+  const entrarCuenta = u => {
+    socket.data.cuenta = u; socket.data.pid = "u_" + u;
+    const x = st(socket.data.pid, cuentas[u].nombre); x.nombre = cuentas[u].nombre; sucio = true;
+    if (x.av && AVS.has(x.av)) socket.data.av = x.av;
+    socket.emit("perfil", x);
+  };
+  const nuevoToken = u => { const t = crypto.randomBytes(24).toString("hex"); tokens[t] = u; sucio = true; return t; };
+  socket.on("registro", ({ usuario, clave, nombre } = {}, cb = () => {}) => {
+    const u = limpiarU(usuario);
+    if (u.length < 3) return cb({ ok: false, error: "Usuario: mínimo 3 letras o números" });
+    if (String(clave || "").length < 6) return cb({ ok: false, error: "Contraseña: mínimo 6 caracteres" });
+    if (cuentas[u]) return cb({ ok: false, error: "Ese usuario ya existe" });
+    const sal = crypto.randomBytes(16).toString("hex");
+    cuentas[u] = { sal, hash: hash(String(clave), sal), nombre: String(nombre || u).slice(0, 16) || u };
+    entrarCuenta(u); cb({ ok: true, token: nuevoToken(u), usuario: u });
+  });
+  socket.on("login", ({ usuario, clave } = {}, cb = () => {}) => {
+    const u = limpiarU(usuario), c = cuentas[u];
+    if (++intentos > 8) return cb({ ok: false, error: "Demasiados intentos, recarga la página" });
+    if (!c || !crypto.timingSafeEqual(Buffer.from(hash(String(clave || ""), c.sal)), Buffer.from(c.hash))) return cb({ ok: false, error: "Usuario o contraseña incorrectos" });
+    entrarCuenta(u); cb({ ok: true, token: nuevoToken(u), usuario: u });
+  });
+  socket.on("sesion", ({ token } = {}, cb = () => {}) => {
+    const u = tokens[token]; if (!u || !cuentas[u]) return cb({ ok: false });
+    entrarCuenta(u); cb({ ok: true, usuario: u });
+  });
+  socket.on("logout", ({ token } = {}, cb = () => {}) => {
+    delete tokens[token]; socket.data.cuenta = null; socket.data.pid = null; sucio = true; cb({ ok: true });
+  });
   socket.on("reaccion", e => {
     const s = sala(), j = s && J(s, yo);
     if (j && ["😂", "👏", "😱", "🔥"].includes(e)) io.to(s.codigo).emit("reaccion", { e, n: j.nombre });
   });
   socket.on("ranking", (_, cb = () => {}) => {
-    const l = Object.entries(stats).filter(([, v]) => v.partidas > 0).map(([k, v]) => ({ k, ...v }))
+    const l = Object.entries(stats).filter(([k, v]) => k.startsWith("u_") && v.partidas > 0).map(([k, v]) => ({ k, ...v }))
       .sort((a, b) => b.copas - a.copas || b.torneos - a.torneos || a.partidas - b.partidas);
     const i = l.findIndex(x => x.k === socket.data.pid);
-    cb({ top: l.slice(0, 20).map(x => ({ a: x.av, n: x.nombre, c: x.copas, t: x.torneos, p: x.partidas, yo: x.k === socket.data.pid })), pos: i + 1, total: l.length });
+    cb({ top: l.slice(0, 20).map(x => ({ a: x.av, n: x.nombre, c: x.copas, t: x.torneos, p: x.partidas, yo: x.k === socket.data.pid })), pos: i + 1, total: l.length, cuenta: !!socket.data.cuenta });
   });
   socket.on("salir", () => {
     const s = sala(), j = s && J(s, yo);
@@ -250,4 +309,4 @@ io.on("connection", socket => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log("🌸 Flores Repetidas v2 en http://localhost:" + PORT));
+cargar().then(() => server.listen(PORT, () => console.log("🌸 Flores Repetidas v2 en http://localhost:" + PORT + (pool ? " (base de datos PostgreSQL)" : " (datos en archivo)"))));
