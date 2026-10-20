@@ -64,6 +64,10 @@ body[data-marco=dorado] .tab{border-color:#ffd23f;box-shadow:0 0 22px rgba(255,2
 body[data-marco=verde] .tab{border-color:#39ff88;box-shadow:0 0 22px rgba(57,255,136,.5),inset 0 0 30px rgba(57,255,136,.1)}
 body[data-marco=fuego] .tab{border-color:#ff6a00;box-shadow:0 0 26px rgba(255,106,0,.65),inset 0 0 30px rgba(255,60,0,.15)}
 .c.esp .in{transform:rotateY(180deg)}#pwr{display:flex}#pwr button{margin:0}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:20;display:flex;align-items:center;justify-content:center;padding:16px}.ov .p{max-width:420px;width:100%;margin:0}
+.bar{height:8px;background:rgba(0,229,255,.15);border-radius:4px;overflow:hidden;margin:4px 0 12px}.bar i{display:block;height:100%;background:linear-gradient(90deg,#00e5ff,#ff2bd6)}
+.row{display:flex;gap:6px;align-items:center;justify-content:space-between;padding:6px 8px;border-bottom:1px solid var(--bo)}.row button{width:auto;margin:0 0 0 4px;padding:6px 10px;clip-path:none;font-size:.8rem}
+@keyframes pop{0%{transform:scale(.3);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}#rev>*{animation:pop .5s}
 </style></head><body><main>
 <h1>🌸 Flores Repetidas</h1>
 <section id="inicio" class="p">
@@ -77,6 +81,7 @@ body[data-marco=fuego] .tab{border-color:#ff6a00;box-shadow:0 0 26px rgba(255,10
  <button id="bRank" class="s">🏆 Ranking y logros</button>
  <button id="bTienda" class="s">🎁 Cofres y personajes</button>
  <button id="bApu" class="s">🎰 Apuestas de monedas</button>
+ <button id="bMis" class="s">🎯 Misiones diarias</button><button id="bAmi" class="s">👥 Amigos</button><button id="bAyuda" class="s">❓ Cómo jugar</button>
  <button id="bCuenta" class="s">🔐 Cuenta (guarda tu progreso)</button>
  <p class="c0">— o únete con un código —</p>
  <input id="cIn" placeholder="CÓDIGO" maxlength="4" style="text-transform:uppercase;text-align:center;letter-spacing:6px">
@@ -91,6 +96,12 @@ body[data-marco=fuego] .tab{border-color:#ff6a00;box-shadow:0 0 26px rgba(255,10
  <button id="apR">👥 Buscar rival real</button><button id="apB">🤖 Retar al Bot Súper Difícil</button><button id="apC" class="s oc">✖ Cancelar búsqueda</button>
  <div id="apE" class="er"></div><button id="apV" class="s">Volver</button>
 </section>
+<section id="mis" class="p oc"><h3 style="margin-top:0">🎯 Misiones de hoy</h3><div id="misL"></div>
+ <div class="c0">Se renuevan cada día. Completa las 3 y ganas +50 🪙 extra.</div><button id="misV" class="s" style="margin-top:10px">Volver</button></section>
+<section id="amigos" class="p oc"><h3 style="margin-top:0">👥 Amigos</h3>
+ <input id="amU" placeholder="Usuario de tu amigo" maxlength="16"><button id="amA">Agregar amigo</button><button id="amB" class="s">👤 Ver perfil de este usuario</button><button id="amYo" class="s">⭐ Mi perfil público</button>
+ <div id="amE" class="er"></div><div id="amL"></div><button id="amV" class="s">Volver</button></section>
+<section id="perfp" class="p oc"><div id="ppC"></div><button id="ppAdd" class="oc" style="margin-top:10px">➕ Agregar a mis amigos</button><button id="ppV" class="s">Volver</button></section>
 <section id="cuenta" class="p oc">
  <h3 style="margin-top:0">🔐 Mi cuenta</h3><div id="cInfo" class="c0" style="margin-bottom:10px"></div>
  <input id="cU" placeholder="Usuario (3-16, letras y números)" maxlength="16" autocomplete="username">
@@ -142,13 +153,16 @@ body[data-marco=fuego] .tab{border-color:#ff6a00;box-shadow:0 0 26px rgba(255,10
  <button id="bSalir" class="s">⬅ Salir de la partida</button>
  <div class="p" style="margin-top:10px"><div id="log"></div><input id="ch" placeholder="Escribe y pulsa Enter" maxlength="120" style="margin:0"></div>
 </section></main>
+<div id="tut" class="ov oc"><div class="p"><h3 id="tT" style="margin-top:0"></h3><p id="tP"></p><button id="tN">Siguiente</button><button id="tS" class="s">Saltar</button></div></div>
+<div id="retoBox" class="ov oc"><div class="p"><h3 id="rtT" style="margin-top:0"></h3><button id="rtA">✅ Aceptar</button><button id="rtR" class="s">Rechazar</button></div></div>
+<button id="bMus" class="s" style="position:fixed;top:10px;right:60px;width:auto;padding:6px 10px;z-index:9;clip-path:none;margin:0">🎶</button>
 <button id="bMute" class="s" style="position:fixed;top:10px;right:10px;width:auto;padding:6px 10px;z-index:9;clip-path:none;margin:0">🔊</button>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const $=id=>document.getElementById(id),FL=["🌹","🌻","🌷","🌸","🌼","🌺","💐","🪻","🪷","🏵️","🌿","🍀","🌵","🌴","🌱","🍁","🍄","🌾"];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const mez=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
-const nom=()=>{const n=$("nombre").value.trim()||"Jugador";try{localStorage.setItem("fr-nombre",n)}catch(e){}return n},ver=id=>["inicio","solo","espera","juego","rank","tienda","cuenta","apu"].forEach(x=>$(x).classList.toggle("oc",x!==id));
+const nom=()=>{const n=$("nombre").value.trim()||"Jugador";try{localStorage.setItem("fr-nombre",n)}catch(e){}return n},ver=id=>["inicio","solo","espera","juego","rank","tienda","cuenta","apu","amigos","mis","perfp"].forEach(x=>$(x).classList.toggle("oc",x!==id));
 let ac,MUTE=false;function son(t){if(MUTE)return;try{navigator.vibrate&&navigator.vibrate(t==="ok"?40:t==="no"?[20,40,20]:[80,40,80])}catch(e){}try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain(),f={ok:[660,880],no:[220,160],fin:[523,784,1046]}[t];o.connect(g);g.connect(ac.destination);f.forEach((x,i)=>o.frequency.setValueAtTime(x,ac.currentTime+i*.12));g.gain.value=.08;o.start();o.stop(ac.currentTime+f.length*.12+.05)}catch(e){}}
 function tab(el,cs,tam,fn){
  if(el.dataset.n!=cs.length+"-"+tam){el.dataset.n=cs.length+"-"+tam;el.className="tab t"+tam;el.style.gridTemplateColumns=`repeat(${tam},1fr)`;
@@ -207,7 +221,7 @@ function verTienda(){$("saldo").textContent=`🪙 ${saldo()} monedas`;$("bCofre"
 $("bTienda").onclick=()=>{ver("tienda");verTienda()};$("bVolver3").onclick=()=>ver("inicio");
 $("bCofre").onclick=()=>{$("bCofre").disabled=true;$("rev").innerHTML='<div class="cofre">🎁</div>';
  socket.emit("cofre",null,r=>setTimeout(()=>{if(!r.ok){$("rev").textContent=r.error||"Error";return verTienda()}
-  const it=CF.find(c=>c[0]===r.a);if(it[2]>=3)confeti();if(it[2]===4)toast("🌟 ¡¡MÍTICO!! "+it[1]);$("rev").innerHTML=av3d(r.a,110)+`<div style="color:${RCF[it[2]]};font-weight:700">${RN[it[2]]}: ${it[1]}</div>`+(r.dup?`<div class="c0">¡Repetido! Recibes ${r.dup} 🪙 de vuelta</div>`:'<div class="c0">¡Personaje nuevo!</div>');verTienda()},900))};
+  const it=CF.find(c=>c[0]===r.a);sonCofre(it[2]);if(it[2]>=3)confeti();if(it[2]===4)toast("🌟 ¡¡MÍTICO!! "+it[1]);$("rev").innerHTML=av3d(r.a,110)+`<div style="color:${RCF[it[2]]};font-weight:700">${RN[it[2]]}: ${it[1]}</div>`+(r.dup?`<div class="c0">¡Repetido! Recibes ${r.dup} 🪙 de vuelta</div>`:'<div class="c0">¡Personaje nuevo!</div>');verTienda()},900))};
 const toast=t=>{const d=document.createElement("div");d.className="toast";d.textContent=t;d.style.top=(14+document.querySelectorAll(".toast").length*46)+"px";document.body.appendChild(d);setTimeout(()=>d.remove(),4500)};
 const resumen=()=>{$("miP").textContent=`${AV} 🏆 ${PF.copas} copas · 👑 ${PF.torneos} torneos · 🎮 ${PF.partidas} partidas · 🪙 ${saldo()}`};resumen();
 socket.on("perfil",x=>{const antes=LOG.filter(l=>l[2](PF)).map(l=>l[1]).concat(CH.filter(c=>c[4](PF)).map(c=>c[1]));PF={copas:x.copas,torneos:x.torneos,partidas:x.partidas,parejas:x.parejas,gastado:x.gastado||0,bonus:x.bonus||0,items:x.items||[]};
@@ -218,7 +232,7 @@ function verRank(){drawCH();drawCos();$("rkNota").textContent=USR?"":"🔐 Crea 
  $("perf").innerHTML=`<div class="c0">🏆 <b>${PF.copas}</b> copas · 👑 <b>${PF.torneos}</b> torneos · 🎮 ${PF.partidas} partidas · 🌸 ${PF.parejas} parejas</div>`;
  $("logros").innerHTML=LOG.map(l=>{const ok=l[2](PF);return `<div style="opacity:${ok?1:.4}">${ok?l[0]:"🔒"} ${l[1]}</div>`}).join("");
  $("top").textContent="Cargando…";
- socket.emit("ranking",null,r=>{$("top").innerHTML=r.top.length?r.top.map((x,i)=>`<div class="fila${x.yo?" yo":""}"><span>${["🥇","🥈","🥉"][i]||(i+1)+"."} ${x.a||""} ${esc(x.n)}</span><span>🏆${x.c} · 👑${x.t}</span></div>`).join("")+(r.pos>20?`<div class="c0">Tu posición: #${r.pos} de ${r.total}</div>`:""):"Aún no hay partidas jugadas."})}
+ socket.emit("ranking",null,r=>{$("top").innerHTML=r.top.length?r.top.map((x,i)=>`<div class="fila${x.yo?" yo":""}" data-u="${x.u}" style="cursor:pointer"><span>${["🥇","🥈","🥉"][i]||(i+1)+"."} ${x.a||""} ${esc(x.n)}</span><span>🏆${x.c} · 👑${x.t}</span></div>`).join("")+(r.pos>20?`<div class="c0">Tu posición: #${r.pos} de ${r.total}</div>`:""):"Aún no hay partidas jugadas."})}
 $("bRank").onclick=()=>{ver("rank");verRank()};$("bVolver2").onclick=()=>ver("inicio");
 const guardar=(c,t)=>{miId=t;try{localStorage.setItem("fr-sesion",JSON.stringify({codigo:c,token:t}))}catch(e){}};
 socket.on("connect",()=>{socket.emit("perfil",{pid,nombre:nmG(),stats:PF,av:AV});if(TK)socket.emit("sesion",{token:TK},r=>{if(r.ok){USR=r.usuario;pCta()}else{TK=null;try{localStorage.removeItem("fr-tk")}catch(e){}}});const s=sv();if(s)socket.emit("reconectar",s,r=>{if(r.ok)miId=s.token;else try{localStorage.removeItem("fr-sesion")}catch(e){}})});
@@ -259,7 +273,43 @@ const rCta=r=>{if(!r.ok){$("cE").textContent=r.error||"Error";return}TK=r.token;
 $("bCuenta").onclick=()=>{ver("cuenta");pCta()};
 const apP=()=>{$("apS").textContent="🪙 "+saldo();$("apE").textContent=USR?"":"🔐 Inicia sesión en tu cuenta para apostar."};
 const apBusy=b=>{["apR","apB"].forEach(i=>$(i).classList.toggle("oc",b));$("apC").classList.toggle("oc",!b)};
-$("bApu").onclick=()=>{ver("apu");apP();apBusy(false)};$("apV").onclick=()=>ver("inicio");
+$("bApu").onclick=()=>{ver("apu");apP();apBusy(false)};
+// ---- música y sonidos de cofre (generados con WebAudio, sin archivos) ----
+function nota(f,t,d,tipo,v){ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain(),T=ac.currentTime+t;o.type=tipo||"sine";o.frequency.value=f;o.connect(g);g.connect(ac.destination);g.gain.setValueAtTime(0,T);g.gain.linearRampToValueAtTime(v,T+.03);g.gain.exponentialRampToValueAtTime(.0001,T+d);o.start(T);o.stop(T+d+.05)}
+function sonCofre(r){if(MUTE)return;try{const S=[[[392,0,.25]],[[392,0,.2],[523,.15,.3]],[[392,0,.2],[494,.12,.2],[587,.24,.35]],[[392,0,.2],[494,.1,.2],[587,.2,.2],[784,.3,.5],[1175,.45,.6]],[[196,0,1.2],[392,0,.8],[587,.15,.8],[784,.3,.9],[988,.45,1],[1319,.6,1.4],[1568,.8,1.6]]][r];S.forEach(([f,t,d])=>nota(f,t,d,r>=3?"triangle":"sine",r===4?.09:.07))}catch(e){}}
+const MN=[261.6,293.7,329.6,392,440,523.3,587.3];let mus=null,musOn=false;
+function musica(on){clearInterval(mus);mus=null;if(!on)return;const t=()=>{if(MUTE||document.hidden)return;try{const f=MN[Math.random()*MN.length|0];nota(f/2,0,2.6,"sine",.035);if(Math.random()<.6)nota(f,.4,1.6,"triangle",.02)}catch(e){}};t();mus=setInterval(t,1800)}
+const musBtn=()=>{musOn=!musOn;musica(musOn);$("bMus").textContent=musOn?"🎵":"🎶";try{localStorage.setItem("fr-mus",musOn?"1":"0")}catch(e){}};
+$("bMus").onclick=e=>{e.stopPropagation();musBtn()};
+document.addEventListener("pointerdown",()=>{let p=null;try{p=localStorage.getItem("fr-mus")}catch(e){}if(p!=="0"&&!musOn){musOn=true;musica(true);$("bMus").textContent="🎵"}},{once:true});
+// ---- tutorial ----
+const TUT=[["🎴 Cómo se juega","Voltea 2 cartas por turno. Si son iguales, son tuyas y repites turno. Gana quien junte más parejas. Tienes 20 segundos por turno."],["👁️🧊 Poderes","Empiezas con 1 poder y ganas otro cada 2 parejas seguidas. Espiar te muestra una carta oculta solo a ti. Congelar hace que el siguiente jugador pierda su turno."],["🪙 Monedas","Ganas monedas jugando, ganándole a la PC (2, 30 o 90), en partida rápida (90 si ganas, 10 si pierdes) y con las misiones diarias. Úsalas en cofres: personajes, dorsos y marcos."],["🎯 Misiones y amigos","Cada día hay 3 misiones con monedas extra. Crea una cuenta para guardar tu progreso, entrar al ranking, agregar amigos y retarlos."]];
+let tI=0;const tutV=()=>{$("tT").textContent=TUT[tI][0];$("tP").textContent=TUT[tI][1];$("tN").textContent=tI<TUT.length-1?"Siguiente":"¡A jugar!"},tutX=()=>{$("tut").classList.add("oc");try{localStorage.setItem("fr-tut","1")}catch(e){}};
+const tutA=()=>{tI=0;tutV();$("tut").classList.remove("oc")};
+$("tN").onclick=()=>{if(++tI>=TUT.length)tutX();else tutV()};$("tS").onclick=tutX;$("bAyuda").onclick=tutA;
+try{if(!localStorage.getItem("fr-tut"))tutA()}catch(e){}
+// ---- misiones diarias ----
+$("bMis").onclick=()=>{ver("mis");$("misL").textContent="Cargando…";socket.emit("misiones",null,l=>{$("misL").innerHTML=l.length?l.map(m=>`<div><b>${m.ok?"✅":"🎯"} ${esc(m.t)}</b> <span class="c0">(${m.p}/${m.meta}) · +${m.rec} 🪙</span><div class="bar"><i style="width:${m.p/m.meta*100}%"></i></div></div>`).join(""):"Recarga la página para cargar tus misiones."})};
+$("misV").onclick=()=>ver("inicio");
+// ---- amigos y perfil público ----
+function verPP(u){socket.emit("perfilDe",{usuario:u},r=>{if(!r.ok){toast(r.error||"Error");return}ver("perfp");const lg=LOG.filter(l=>l[2](r));
+ $("ppC").innerHTML=`<div style="text-align:center;font-size:3.2rem">${r.av}</div><h3 style="text-align:center;margin:0">${esc(r.n)} <small class="c0">@${r.u}</small> ${r.on?"🟢":""}</h3>
+ <div class="c0" style="text-align:center;margin:8px 0">${r.pos?"🏅 Puesto #"+r.pos+" del ranking":"Sin ranking todavía"}</div>
+ <div class="c0" style="text-align:center">🏆 ${r.copas} copas · 👑 ${r.torneos} torneos · 🎮 ${r.partidas} partidas · 🌸 ${r.parejas} parejas</div>
+ <h3>Logros (${lg.length}/${LOG.length})</h3>${lg.length?lg.map(l=>`<div>${l[0]} ${esc(l[1])}</div>`).join(""):'<div class="c0">Aún sin logros</div>'}`;
+ $("ppAdd").classList.toggle("oc",!USR||r.amigo||r.u===USR);$("ppAdd").onclick=()=>socket.emit("amigoAgregar",{usuario:r.u},x=>{toast(x.ok?"✅ Agregado a tus amigos":x.error);if(x.ok)$("ppAdd").classList.add("oc")})})}
+const amL=()=>socket.emit("amigos",null,r=>{if(!r.ok){$("amL").innerHTML='<div class="c0">🔐 Inicia sesión en tu cuenta para usar amigos.</div>';return}
+ $("amL").innerHTML=r.l.length?r.l.map(a=>`<div class="row"><span>${a.av} ${esc(a.n)} <small class="c0">@${a.u}</small> ${a.on?"🟢":"⚪"}</span><span><button data-v="${a.u}" class="s">👤</button>${a.on?`<button data-r="${a.u}">⚔️ Retar</button>`:""}<button data-q="${a.u}" class="s">🗑️</button></span></div>`).join(""):'<div class="c0">Aún no tienes amigos: agrega a alguien por su usuario.</div>';
+ $("amL").querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>verPP(b.dataset.v));
+ $("amL").querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>socket.emit("retar",{usuario:b.dataset.r},x=>toast(x.ok?"⚔️ Reto enviado":(x.error||"Error"))));
+ $("amL").querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>socket.emit("amigoQuitar",{usuario:b.dataset.q},amL))});
+$("bAmi").onclick=()=>{ver("amigos");$("amE").textContent="";amL()};
+$("amA").onclick=()=>socket.emit("amigoAgregar",{usuario:$("amU").value},r=>{$("amE").textContent=r.ok?"✅ Agregado":(r.error||"");if(r.ok){$("amU").value="";amL()}});
+$("amB").onclick=()=>{if($("amU").value)verPP($("amU").value)};$("amYo").onclick=()=>USR?verPP(USR):($("amE").textContent="Inicia sesión primero");
+$("amV").onclick=()=>ver("inicio");$("ppV").onclick=()=>ver("inicio");
+$("top").onclick=e=>{const d=e.target.closest("[data-u]");if(d)verPP(d.dataset.u)};
+socket.on("reto",r=>{$("rtT").textContent=`⚔️ ${r.de} te reta a una partida`;$("retoBox").classList.remove("oc");
+ $("rtA").onclick=()=>{$("retoBox").classList.add("oc");socket.emit("aceptarReto",{u:r.u},x=>{if(!x.ok)toast(x.error)})};$("rtR").onclick=()=>$("retoBox").classList.add("oc");setTimeout(()=>$("retoBox").classList.add("oc"),30000)});$("apV").onclick=()=>ver("inicio");
 const apGo=bot=>socket.emit("apuesta",{monto:+$("apM").value,bot},r=>{if(!r.ok){$("apE").textContent=r.error||"Error";return}$("apE").textContent=r.espera?"🔎 Buscando rival para apostar… no cierres la página":"";if(r.espera)apBusy(true)});
 $("apR").onclick=()=>apGo(false);$("apB").onclick=()=>apGo(true);
 $("apC").onclick=()=>{socket.emit("cancelarApuesta");apBusy(false);$("apE").textContent=""};$("bVolver4").onclick=()=>ver("inicio");
