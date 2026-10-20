@@ -76,11 +76,20 @@ body[data-marco=fuego] .tab{border-color:#ff6a00;box-shadow:0 0 26px rgba(255,10
  <button id="bBuscar">⚡ Buscar partida rápida · gana 90 🪙, quien pierde 10 🪙</button><button id="bCancel" class="s oc">✖ Cancelar búsqueda</button>
  <button id="bRank" class="s">🏆 Ranking y logros</button>
  <button id="bTienda" class="s">🎁 Cofres y personajes</button>
+ <button id="bApu" class="s">🎰 Apuestas de monedas</button>
  <button id="bCuenta" class="s">🔐 Cuenta (guarda tu progreso)</button>
  <p class="c0">— o únete con un código —</p>
  <input id="cIn" placeholder="CÓDIGO" maxlength="4" style="text-transform:uppercase;text-align:center;letter-spacing:6px">
  <button id="bUnir" class="s">Unirse</button><div id="eI" class="er"></div>
  <p class="c0" style="font-size:.8rem;margin:0"><a href="/privacy.html" style="color:var(--su)">Política de privacidad</a></p>
+</section>
+<section id="apu" class="p oc">
+ <h3 style="margin-top:0">🎰 Apuestas de monedas</h3>
+ <div id="apS" class="cod" style="font-size:1.4rem;letter-spacing:2px"></div>
+ <p class="c0">Cada jugador pone lo mismo y <b>el que gana se lleva todo el botín</b>. Solo con cuenta. No hay revancha ni devolución si abandonas.</p>
+ <select id="apM"><option value="50">Apostar 50 🪙 (botín 100)</option><option value="100">Apostar 100 🪙 (botín 200)</option><option value="200" selected>Apostar 200 🪙 (botín 400)</option></select>
+ <button id="apR">👥 Buscar rival real</button><button id="apB">🤖 Retar al Bot Súper Difícil</button><button id="apC" class="s oc">✖ Cancelar búsqueda</button>
+ <div id="apE" class="er"></div><button id="apV" class="s">Volver</button>
 </section>
 <section id="cuenta" class="p oc">
  <h3 style="margin-top:0">🔐 Mi cuenta</h3><div id="cInfo" class="c0" style="margin-bottom:10px"></div>
@@ -139,7 +148,7 @@ body[data-marco=fuego] .tab{border-color:#ff6a00;box-shadow:0 0 26px rgba(255,10
 const $=id=>document.getElementById(id),FL=["🌹","🌻","🌷","🌸","🌼","🌺","💐","🪻","🪷","🏵️","🌿","🍀","🌵","🌴","🌱","🍁","🍄","🌾"];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const mez=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
-const nom=()=>{const n=$("nombre").value.trim()||"Jugador";try{localStorage.setItem("fr-nombre",n)}catch(e){}return n},ver=id=>["inicio","solo","espera","juego","rank","tienda","cuenta"].forEach(x=>$(x).classList.toggle("oc",x!==id));
+const nom=()=>{const n=$("nombre").value.trim()||"Jugador";try{localStorage.setItem("fr-nombre",n)}catch(e){}return n},ver=id=>["inicio","solo","espera","juego","rank","tienda","cuenta","apu"].forEach(x=>$(x).classList.toggle("oc",x!==id));
 let ac,MUTE=false;function son(t){if(MUTE)return;try{navigator.vibrate&&navigator.vibrate(t==="ok"?40:t==="no"?[20,40,20]:[80,40,80])}catch(e){}try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain(),f={ok:[660,880],no:[220,160],fin:[523,784,1046]}[t];o.connect(g);g.connect(ac.destination);f.forEach((x,i)=>o.frequency.setValueAtTime(x,ac.currentTime+i*.12));g.gain.value=.08;o.start();o.stop(ac.currentTime+f.length*.12+.05)}catch(e){}}
 function tab(el,cs,tam,fn){
  if(el.dataset.n!=cs.length+"-"+tam){el.dataset.n=cs.length+"-"+tam;el.className="tab t"+tam;el.style.gridTemplateColumns=`repeat(${tam},1fr)`;
@@ -215,14 +224,14 @@ const guardar=(c,t)=>{miId=t;try{localStorage.setItem("fr-sesion",JSON.stringify
 socket.on("connect",()=>{socket.emit("perfil",{pid,nombre:nmG(),stats:PF,av:AV});if(TK)socket.emit("sesion",{token:TK},r=>{if(r.ok){USR=r.usuario;pCta()}else{TK=null;try{localStorage.removeItem("fr-tk")}catch(e){}}});const s=sv();if(s)socket.emit("reconectar",s,r=>{if(r.ok)miId=s.token;else try{localStorage.removeItem("fr-sesion")}catch(e){}})});
 const crear=modo=>socket.emit("crearSala",{nombre:nom(),modo,tam:4},r=>{if(r.ok)guardar(r.codigo,r.token)});
 $("bLibre").onclick=()=>crear("libre");$("bTorneo").onclick=()=>crear("torneo");
-const busc=on=>{$("bBuscar").classList.toggle("oc",on);$("bCancel").classList.toggle("oc",!on);$("eI").textContent=on?"🔎 Buscando rival… Si en 6 minutos no hay nadie, jugarás contra un Bot Difícil (no cierres la página)":""};
+const busc=on=>{$("bBuscar").classList.toggle("oc",on);$("bCancel").classList.toggle("oc",!on);$("eI").textContent=on?"🔎 Buscando rival… Si en 20 segundos no hay nadie, jugarás contra un Bot Difícil (no cierres la página)":""};
 $("bBuscar").onclick=()=>{socket.emit("buscar",{nombre:nom()});busc(true)};$("bCancel").onclick=()=>{socket.emit("cancelar");busc(false)};
-socket.on("emparejado",r=>{busc(false);if(r.bot)toast("🤖 No había rivales: jugarás contra el Bot Difícil");guardar(r.codigo,r.token);socket.emit("reconectar",{codigo:r.codigo,token:r.token},()=>{})});
+socket.on("emparejado",r=>{busc(false);apBusy(false);if(r.aviso)toast(r.aviso);if(r.bot)toast("🤖 No había rivales: jugarás contra el Bot Difícil");guardar(r.codigo,r.token);socket.emit("reconectar",{codigo:r.codigo,token:r.token},()=>{})});
 $("bUnir").onclick=()=>socket.emit("unirseSala",{codigo:$("cIn").value,nombre:nom()},r=>r.ok?guardar(r.codigo,r.token):$("eI").textContent=r.error);
 $("bIni").onclick=$("bOtra").onclick=()=>socket.emit("iniciar",null,r=>$("eE").textContent=r.ok?"":r.error||"");
 $("cModo").onchange=()=>socket.emit("config",{modo:$("cModo").value});$("cTam").onchange=()=>socket.emit("config",{tam:+$("cTam").value});
 $("ch").onkeydown=e=>{if(e.key==="Enter"&&e.target.value.trim()){socket.emit("chat",e.target.value);e.target.value=""}};
-const salir=()=>{if(E&&(E.fase==="jugando"||E.fase==="pausa")&&E.juegan.includes(miId)&&!confirm("¿Salir de la partida? Tu rival ganará."))return;
+const salir=()=>{if(E&&(E.fase==="jugando"||E.fase==="pausa")&&E.juegan.includes(miId)&&!confirm("¿Salir de la partida? Tu rival ganará."+(E&&E.apuesta?" Perderás tus "+E.apuesta+" 🪙.":"")))return;
  socket.emit("salir");try{localStorage.removeItem("fr-sesion")}catch(e){}E=null;miId=null;$("log").innerHTML="";$("eE").textContent="";ver("inicio")};
 $("bSalir").onclick=$("bSalirE").onclick=salir;
 const confeti=()=>{for(let i=0;i<40;i++){const d=document.createElement("div");d.className="cf";d.textContent=["🌸","🌼","✨","🌺","🎉"][i%5];d.style.left=Math.random()*100+"vw";d.style.animationDelay=Math.random()*1.5+"s";document.body.appendChild(d);setTimeout(()=>d.remove(),5000)}};
@@ -247,7 +256,13 @@ let TK=(()=>{try{return localStorage.getItem("fr-tk")}catch(e){return null}})(),
 const pCta=()=>{$("cInfo").textContent=USR?`✅ Sesión iniciada como ${USR}. Tu progreso y tu lugar en el ranking se guardan en la cuenta.`:"Sin cuenta juegas como invitado y no apareces en el ranking.";
  ["bLogin","bReg","cU","cP"].forEach(i=>$(i).classList.toggle("oc",!!USR));$("bLogout").classList.toggle("oc",!USR);$("bCuenta").textContent=USR?`👤 ${USR} · Mi cuenta`:"🔐 Cuenta (guarda tu progreso)"};
 const rCta=r=>{if(!r.ok){$("cE").textContent=r.error||"Error";return}TK=r.token;USR=r.usuario;try{localStorage.setItem("fr-tk",TK)}catch(e){}$("cE").textContent="";$("cP").value="";pCta()};
-$("bCuenta").onclick=()=>{ver("cuenta");pCta()};$("bVolver4").onclick=()=>ver("inicio");
+$("bCuenta").onclick=()=>{ver("cuenta");pCta()};
+const apP=()=>{$("apS").textContent="🪙 "+saldo();$("apE").textContent=USR?"":"🔐 Inicia sesión en tu cuenta para apostar."};
+const apBusy=b=>{["apR","apB"].forEach(i=>$(i).classList.toggle("oc",b));$("apC").classList.toggle("oc",!b)};
+$("bApu").onclick=()=>{ver("apu");apP();apBusy(false)};$("apV").onclick=()=>ver("inicio");
+const apGo=bot=>socket.emit("apuesta",{monto:+$("apM").value,bot},r=>{if(!r.ok){$("apE").textContent=r.error||"Error";return}$("apE").textContent=r.espera?"🔎 Buscando rival para apostar… no cierres la página":"";if(r.espera)apBusy(true)});
+$("apR").onclick=()=>apGo(false);$("apB").onclick=()=>apGo(true);
+$("apC").onclick=()=>{socket.emit("cancelarApuesta");apBusy(false);$("apE").textContent=""};$("bVolver4").onclick=()=>ver("inicio");
 $("bLogin").onclick=()=>socket.emit("login",{usuario:$("cU").value,clave:$("cP").value},rCta);
 $("bReg").onclick=()=>socket.emit("registro",{usuario:$("cU").value,clave:$("cP").value,nombre:nmG()},rCta);
 $("bLogout").onclick=()=>{socket.emit("logout",{token:TK},()=>{});try{localStorage.removeItem("fr-tk");localStorage.removeItem("fr-perfil")}catch(e){}location.reload()};
@@ -261,14 +276,14 @@ function pintar(){const e=E,soyH=e.host===miId;
  if(e.fase==="espera"){ver("espera");$("cSala").textContent=e.codigo;$("lE").innerHTML=e.jugadores.map(j=>chip(j,e)).join("");
   $("cfg").classList.toggle("oc",!soyH);$("cModo").value=e.modo;$("cTam").value=e.tam;
   $("mE").textContent=soyH?"Comparte el código y pulsa Iniciar.":`Modo: ${e.modo==="torneo"?"torneo":"libre"} · Esperando al anfitrión…`;return}
- ver("juego");$("hd").textContent=(e.modo==="torneo"?"🏆 Torneo · Ronda "+e.ronda:"Partida libre")+" · Sala "+e.codigo;
+ ver("juego");$("hd").textContent=(e.modo==="torneo"?"🏆 Torneo · Ronda "+e.ronda:"Partida libre")+" · Sala "+e.codigo+(e.apuesta?" · 🎰 Botín "+e.apuesta*2+" 🪙":"");
  $("mar").innerHTML=e.jugadores.map(j=>chip(j,e)).join("");
  const mi=e.turno===miId&&e.fase==="jugando",q=e.jugadores.find(j=>j.id===e.turno);
  tab($("tab"),e.cartas,e.tam,i=>{if(mi)socket.emit("voltear",{i})});
  {const me=e.jugadores.find(j=>j.id===miId),jg=e.fase==="jugando"&&e.juegan.includes(miId);$("pwr").classList.toggle("oc",!jg);
   $("pEsp").textContent=`👁️ Espiar (${me?me.pw:0})`;$("pCon").textContent=`🧊 Congelar (${me?me.pw:0})`;$("pEsp").disabled=$("pCon").disabled=!(mi&&me&&me.pw>0)}
  $("msg").textContent=e.aviso||(e.fase==="jugando"?(mi?"👉 ¡Es tu turno!":e.juegan.includes(miId)||e.modo==="libre"?`Turno de ${q?q.nombre:"…"}`:`👀 Mirando · turno de ${q?q.nombre:"…"}`):"");
- $("fin").classList.toggle("oc",e.fase!=="fin")}
+ $("fin").classList.toggle("oc",e.fase!=="fin"||e.apuesta>0)}
 setInterval(()=>{$("barra").style.width=E&&E.fase==="jugando"?Math.max(0,(lim-Date.now())/200)+"%":"0"},200);
 if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
 </script></body></html>
