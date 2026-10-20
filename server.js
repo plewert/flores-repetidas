@@ -33,7 +33,7 @@ setInterval(async () => {
 }, 8000);
 const AVS = new Set(["🌸","🐝","🐞","🦋","🦊","🐢","🧚","🦉","🦚","🐉","🦄","🧙","🔥"]);
 // personajes que solo salen en cofres (mismo orden y rareza que en el cliente)
-const CF = ["🐱","🐶","🐸","🐼","🐵","🥷","🤖","🦅","🐺","👽","🐲","🦖","🧞","🧜"], RARCF = [0,0,0,0,0,1,1,1,1,2,2,2,3,3], CFS = new Set(CF), COFRE = 50;
+const CF = ["🐱","🐶","🐸","🐼","🐵","🥷","🤖","🦅","🐺","👽","🐲","🦖","🧞","🧜","🦁","🐯","🦈","🧛","🦂","🐙","🌞","💀","🛸"], RARCF = [0,0,0,0,0,1,1,1,1,2,2,2,3,3,3,3,3,3,3,4,4,4,4], CFS = new Set(CF), COFRE = 50;
 CF.forEach(c => AVS.add(c));
 function st(k, n) {
   const x = stats[k] = stats[k] || { nombre: n || "Jugador", copas: 0, torneos: 0, partidas: 0, parejas: 0 };
@@ -224,11 +224,13 @@ io.on("connection", socket => {
     const x = st(k);
     if (saldo(x) < COFRE) return cb({ ok: false, error: "Te faltan monedas" });
     x.gastado += COFRE;
-    const u = Math.random() * 100, rar = u < 60 ? 0 : u < 88 ? 1 : u < 98 ? 2 : 3;
+    // probabilidades: común 54 %, raro 28 %, épico 13 %, legendario 4 %, mítico 1 %. Garantía: legendario o mejor cada 30 cofres.
+    const u = Math.random() * 100; let rar = u < 54 ? 0 : u < 82 ? 1 : u < 95 ? 2 : u < 99 ? 3 : 4;
+    x.sinLeg = (x.sinLeg || 0) + 1; if (x.sinLeg >= 30 && rar < 3) rar = 3; if (rar >= 3) x.sinLeg = 0;
     const pool = CF.filter((_, i) => RARCF[i] === rar), a = pool[Math.random() * pool.length | 0];
-    const dup = x.items.includes(a);
-    if (dup) x.bonus += 25; else x.items.push(a);
-    sucio = true; socket.emit("perfil", x); cb({ ok: true, a, dup });
+    const dup = x.items.includes(a), dv = [10, 20, 30, 60, 150][rar];
+    if (dup) x.bonus += dv; else x.items.push(a);
+    sucio = true; socket.emit("perfil", x); cb({ ok: true, a, dup: dup ? dv : 0 });
   });
   socket.on("poder", tipo => {
     const s = sala(), p = s && s.partida, j = s && J(s, yo);
