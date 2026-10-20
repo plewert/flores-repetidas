@@ -46,6 +46,7 @@ button.s{background:transparent;border-color:var(--bo);color:var(--c)}
 .ch b{display:block;font-size:2rem;font-weight:400}.ch.bl{opacity:.45;cursor:default}
 .ch.sel{background:rgba(0,229,255,.2);box-shadow:0 0 14px var(--c)}
 .ch.leg:not(.bl){animation:br 2s infinite alternate}@keyframes br{from{box-shadow:0 0 6px #ffc933}to{box-shadow:0 0 22px #ffc933}}
+.av.leg2.on{animation:br 2s infinite alternate}.av.mit.on{animation:mit 1.3s infinite alternate}@keyframes mit{from{box-shadow:0 0 8px #ff3d5a}to{box-shadow:0 0 26px #ff3d5a,0 0 44px #ffd23f}}
 .esc{perspective:500px;display:inline-block;filter:drop-shadow(0 0 10px var(--rc))}
 .g3d{position:relative;width:100%;height:100%;transform-style:preserve-3d;animation:gir 4s linear infinite}
 .g3d span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
@@ -101,6 +102,7 @@ body[data-marco=fuego] .tab{border-color:#ff6a00;box-shadow:0 0 26px rgba(255,10
  <div id="saldo" class="cod" style="font-size:1.6rem;letter-spacing:2px"></div>
  <p class="c0">Gana monedas jugando: 🏆 +10 por victoria · 👑 +25 por torneo · +2 por partida · +1 por pareja.</p>
  <button id="bCofre">Abrir cofre (50 🪙)</button>
+ <div class="c0" style="font-size:.75rem;margin:-4px 0 8px">⚪ común 54% · 🔵 raro 28% · 🟣 épico 13% · 🟡 legendario 4% · 🔴 <b>mítico 1%</b><br>Garantía: legendario o mejor cada 30 cofres.</div>
  <div id="rev" style="text-align:center;min-height:130px"></div>
  <h3>Personajes de cofre</h3><div id="col" class="rej"></div>
  <p class="c0">Toca uno para equiparlo; aparece junto a tu nombre.</p>
@@ -174,8 +176,9 @@ let E=null,miId=null,lim=0;
 const nmG=()=>{try{return localStorage.getItem("fr-nombre")||""}catch(e){return""}};$("nombre").value=nmG();
 const pid=(()=>{try{let p=localStorage.getItem("fr-pid");if(!p){p=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now());localStorage.setItem("fr-pid",p)}return p}catch(e){return"anon"+Math.random().toString(36).slice(2)}})();
 let PF=(()=>{try{return JSON.parse(localStorage.getItem("fr-perfil"))}catch(e){return null}})()||{};PF={copas:0,torneos:0,partidas:0,parejas:0,gastado:0,bonus:0,items:[],...PF};
-const CF=[["🐱","Gatito",0],["🐶","Perrito",0],["🐸","Ranita",0],["🐼","Panda",0],["🐵","Monito",0],["🥷","Ninja",1],["🤖","Robot",1],["🦅","Águila",1],["🐺","Lobo",1],["👽","Alienígena",2],["🐲","Dragón de Jade",2],["🦖","T-Rex",2],["🧞","Genio",3],["🧜","Sirena",3]];
-const RN=["común","raro","épico","legendario"],RCF=["#8aa0b4","#3a8fe0","#b44aff","#ffc933"];
+const CF=[["🐱","Gatito",0],["🐶","Perrito",0],["🐸","Ranita",0],["🐼","Panda",0],["🐵","Monito",0],["🥷","Ninja",1],["🤖","Robot",1],["🦅","Águila",1],["🐺","Lobo",1],["👽","Alienígena",2],["🐲","Dragón de Jade",2],["🦖","T-Rex",2],["🧞","Genio",3],["🧜","Sirena",3],["🦁","León Rey",3],["🐯","Tigre Imperial",3],["🦈","Tiburón Abisal",3],["🧛","Conde Vampiro",3],["🦂","Escorpión Dorado",3],
+["🐙","Kraken Cósmico",4],["🌞","Rey Sol",4],["💀","Segador Eterno",4],["🛸","Viajero Estelar",4]];
+const RN=["común","raro","épico","legendario","mítico"],RCF=["#8aa0b4","#3a8fe0","#b44aff","#ffc933","#ff3d5a"];
 const saldo=()=>PF.copas*10+PF.torneos*25+PF.partidas*2+PF.parejas+PF.bonus-PF.gastado;
 const LOG=[["🥇","Primera victoria",p=>p.copas>=1],["🎮","Constante: 10 partidas",p=>p.partidas>=10],["🏆","Diez copas",p=>p.copas>=10],["👑","Campeón de torneo",p=>p.torneos>=1],["🌸","Coleccionista: 100 parejas",p=>p.parejas>=100],["🛡️","Veterano: 50 partidas",p=>p.partidas>=50],["💎","Leyenda: 50 copas",p=>p.copas>=50]];
 const CH=[["🌸","Florecita","común","Gratis",p=>true],["🐝","Abeja Obrera","común","Gratis",p=>true],["🐞","Mariquita","común","Gratis",p=>true],
@@ -189,13 +192,13 @@ function drawCH(){$("chs").innerHTML=CH.map(c=>{const ok=c[4](PF);return `<div c
 // ---- cofres: personajes nuevos con efecto 3D (capas CSS giratorias) ----
 const av3d=(a,sz)=>{const it=CF.find(c=>c[0]===a);let l="";for(let z=-12;z<=12;z+=4)l+=`<span style="transform:translateZ(${z}px);${z<12?"filter:brightness(.6)":""}">${a}</span>`;
  return `<div class="esc" style="width:${sz}px;height:${sz}px;font-size:${sz*.7}px;--rc:${RCF[it[2]]}"><div class="g3d">${l}</div></div>`};
-function drawCF(){$("col").innerHTML=CF.map(c=>{const t=PF.items.includes(c[0]);return `<div class="av${t?" on":""}${c[0]===AV?" eq":""}" style="--rc:${RCF[c[2]]}" data-a="${c[0]}">${t?c[0]:"❓"}<small>${t?c[1]:RN[c[2]]}</small></div>`}).join("");
+function drawCF(){$("col").innerHTML=CF.map(c=>{const t=PF.items.includes(c[0]);return `<div class="av${t?" on":""}${c[0]===AV?" eq":""}${c[2]===4?" mit":c[2]===3?" leg2":""}" style="--rc:${RCF[c[2]]}" data-a="${c[0]}">${t?c[0]:"❓"}<small>${t?c[1]:RN[c[2]]}</small></div>`}).join("");
  $("col").querySelectorAll(".on").forEach(d=>d.onclick=()=>{AV=d.dataset.a;try{localStorage.setItem("fr-av",AV)}catch(e){}socket.emit("perfil",{pid,nombre:nmG(),stats:PF,av:AV});drawCF();drawCH();resumen()})}
 function verTienda(){$("saldo").textContent=`🪙 ${saldo()} monedas`;$("bCofre").disabled=saldo()<50;drawCF()}
 $("bTienda").onclick=()=>{ver("tienda");verTienda()};$("bVolver3").onclick=()=>ver("inicio");
 $("bCofre").onclick=()=>{$("bCofre").disabled=true;$("rev").innerHTML='<div class="cofre">🎁</div>';
  socket.emit("cofre",null,r=>setTimeout(()=>{if(!r.ok){$("rev").textContent=r.error||"Error";return verTienda()}
-  const it=CF.find(c=>c[0]===r.a);$("rev").innerHTML=av3d(r.a,110)+`<div style="color:${RCF[it[2]]};font-weight:700">${RN[it[2]]}: ${it[1]}</div>`+(r.dup?'<div class="c0">¡Repetido! Recibes 25 🪙 de vuelta</div>':'<div class="c0">¡Personaje nuevo!</div>');verTienda()},900))};
+  const it=CF.find(c=>c[0]===r.a);if(it[2]>=3)confeti();if(it[2]===4)toast("🌟 ¡¡MÍTICO!! "+it[1]);$("rev").innerHTML=av3d(r.a,110)+`<div style="color:${RCF[it[2]]};font-weight:700">${RN[it[2]]}: ${it[1]}</div>`+(r.dup?`<div class="c0">¡Repetido! Recibes ${r.dup} 🪙 de vuelta</div>`:'<div class="c0">¡Personaje nuevo!</div>');verTienda()},900))};
 const toast=t=>{const d=document.createElement("div");d.className="toast";d.textContent=t;d.style.top=(14+document.querySelectorAll(".toast").length*46)+"px";document.body.appendChild(d);setTimeout(()=>d.remove(),4500)};
 const resumen=()=>{$("miP").textContent=`${AV} 🏆 ${PF.copas} copas · 👑 ${PF.torneos} torneos · 🎮 ${PF.partidas} partidas · 🪙 ${saldo()}`};resumen();
 socket.on("perfil",x=>{const antes=LOG.filter(l=>l[2](PF)).map(l=>l[1]).concat(CH.filter(c=>c[4](PF)).map(c=>c[1]));PF={copas:x.copas,torneos:x.torneos,partidas:x.partidas,parejas:x.parejas,gastado:x.gastado||0,bonus:x.bonus||0,items:x.items||[]};
