@@ -57,7 +57,7 @@ setInterval(() => {
   if (!ya.length) return;
   cola = cola.filter(x => !ya.includes(x));
   ya.forEach(x => {
-    const c = cod(), s = salas[c] = { codigo: c, host: null, modo: "libre", tam: 4, fase: "espera", auto: true, conBot: true, jugadores: [] };
+    const c = cod(), s = salas[c] = { codigo: c, host: null, modo: "libre", tam: 4, fase: "espera", auto: true, conBot: true, rapida: true, jugadores: [] };
     const id = crypto.randomUUID(), j = x.nuevo(s, id, x.nombre); j.conectado = false; j.pid = x.socket.data.pid; j.av = x.socket.data.av || "🌸"; s.host = id;
     s.jugadores.push({ id: "bot_" + c, av: "🤖", nombre: "Bot Difícil", color: COL.find(k => !s.jugadores.some(y => y.color === k)) || COL[1], victorias: 0, puntos: 0, conectado: true, bot: true });
     x.socket.emit("emparejado", { codigo: c, token: id, bot: true });
@@ -88,7 +88,7 @@ function reloj(s) {
 }
 function empezar(s, ids) {
   const fl = mez([...F]).slice(0, s.tam * s.tam / 2);
-  s.partida = { ids, cartas: mez([...fl, ...fl]).map(f => ({ f, e: "oculta" })), turno: 0, vol: [], bloq: false, limite: 0 };
+  s.partida = { ids, cartas: mez([...fl, ...fl]).map(f => ({ f, e: "oculta" })), turno: 0, vol: [], bloq: false, limite: 0, inicio: Date.now() };
   ids.forEach(i => { const j = J(s, i); j.puntos = 0; j.pw = 1; j.racha = 0; }); s.fase = "jugando"; s.aviso = ""; reloj(s);
 }
 function siguiente(s) {
@@ -144,6 +144,16 @@ function finPartida(s) {
     return setTimeout(() => { if (s.fase === "pausa" && !p.decidida) { empezar(s, p.ids); emit(s); } }, 3000);
   }
   gan[0].victorias++; p.decidida = true;
+  // partida rápida (jugador real o Bot Difícil): la 1ª partida de la sala paga 90 al ganador y 10 al que pierde;
+  // las revanchas pagan 30 y 5 (máximo 3 revanchas pagadas por sala). La partida debe durar 20 s o más.
+  if (s.rapida && Date.now() - p.inicio >= 20000) {
+    s.pagos = (s.pagos || 0) + 1;
+    if (s.pagos <= 4) {
+      const [pg, pp] = s.pagos === 1 ? [90, 10] : [30, 5], ms = [];
+      js.forEach(j => { if (!j.pid) return; const g = j === gan[0]; st(j.pid).bonus += g ? pg : pp; sucio = true; ms.push(j.nombre + (g ? " gana " + pg : " recibe " + pp)); });
+      if (ms.length) io.to(s.codigo).emit("aviso", "🪙 " + ms.join(" · "));
+    }
+  }
   js.forEach(j => reg(j, { partidas: 1, parejas: j.puntos, copas: s.conBot ? 0 : (j === gan[0] ? 1 : 0) }));
   if (s.modo === "libre") { s.fase = "fin"; s.campeon = gan[0].id; s.aviso = "🏆 Ganó " + gan[0].nombre; return emit(s); }
   p.ids.forEach(i => { if (i !== gan[0].id) J(s, i).elim = true; });
@@ -330,13 +340,14 @@ io.on("connection", socket => {
     cola = cola.filter(x => x.socket !== socket && x.socket.connected);
     cola.push({ socket, nombre, t: Date.now(), nuevo });
     if (cola.length < 2) return difundir();
-    const [a, b] = cola.splice(0, 2), c = cod();
-    const s = salas[c] = { codigo: c, host: null, modo: "libre", tam: 4, fase: "espera", auto: true, jugadores: [] };
+    const [a, b] = cola.splice(0, 2), c = cod(), salidas = [];
+    const s = salas[c] = { codigo: c, host: null, modo: "libre", tam: 4, fase: "espera", auto: true, rapida: true, jugadores: [] };
     [a, b].forEach(x => {
       const id = crypto.randomUUID(), j = nuevo(s, id, x.nombre); j.conectado = false; j.pid = x.socket.data.pid; j.av = x.socket.data.av || "🌸";
       if (!s.host) s.host = id;
-      x.socket.emit("emparejado", { codigo: c, token: id });
+      salidas.push([x.socket, { codigo: c, token: id }]);
     });
+    salidas.forEach(([sk, d]) => sk.emit("emparejado", d)); // se avisa cuando ya existen los dos jugadores
     difundir();
   });
   socket.on("cancelar", () => { cola = cola.filter(x => x.socket !== socket); difundir(); });
