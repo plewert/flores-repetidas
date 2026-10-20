@@ -46,8 +46,26 @@ function reg(j, d) {
   if (!j || !j.pid) return;
   const x = st(j.pid, j.nombre); x.nombre = j.nombre;
   for (const k in d) x[k] += d[k];
+  if (d.partidas) prog(j.pid, { jug: d.partidas, par: d.parejas || 0 });
   sucio = true; if (j.sid) io.to(j.sid).emit("perfil", x);
 }
+// ---- misiones diarias, amigos y perfil público ----
+const porPid = new Map(), retos = {};
+const MIS = [["jug",3,20,"Juega 3 partidas"],["gan",1,30,"Gana 1 partida"],["par",15,25,"Encuentra 15 parejas"],["gan",3,60,"Gana 3 partidas"],["bot",1,40,"Gánale a la PC en entrenamiento"],["pod",2,25,"Usa 2 poderes"],["cof",1,15,"Abre 1 cofre"]];
+const hoy = () => new Date().toISOString().slice(0, 10);
+const misHoy = x => { if (!x.mis || x.mis.d !== hoy()) x.mis = { d: hoy(), p: {}, c: {}, t: 0 }; const n = Math.floor(Date.now() / 864e5); return [n % 7, (n + 2) % 7, (n + 4) % 7]; };
+function prog(pid, d) {
+  if (!pid) return;
+  const x = st(pid), ids = misHoy(x), sk = porPid.get(pid);
+  for (const k in d) x.mis.p[k] = (x.mis.p[k] || 0) + d[k];
+  ids.forEach(i => {
+    const [k, meta, rec, txt] = MIS[i];
+    if ((x.mis.p[k] || 0) >= meta && !x.mis.c[i]) { x.mis.c[i] = 1; x.bonus += rec; if (sk) sk.emit("aviso", "✅ Misión: " + txt + " · +" + rec + " 🪙"); }
+  });
+  if (ids.every(i => x.mis.c[i]) && !x.mis.t) { x.mis.t = 1; x.bonus += 50; if (sk) sk.emit("aviso", "🎉 ¡Misiones de hoy completas! +50 🪙"); }
+  sucio = true; if (sk) sk.emit("perfil", x);
+}
+const listaMis = x => misHoy(x).map(i => ({ t: MIS[i][3], meta: MIS[i][1], rec: MIS[i][2], p: Math.min(x.mis.p[MIS[i][0]] || 0, MIS[i][1]), ok: !!x.mis.c[i] }));
 const hash = (c, sal) => crypto.scryptSync(c, sal, 32).toString("hex");
 const limpiarU = u => String(u || "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 16);
 const difundir = () => io.emit("online", { n: io.sockets.sockets.size, b: cola.length });
@@ -176,6 +194,7 @@ function finPartida(s) {
   }
   gan[0].victorias++; p.decidida = true;
   if (s.depositos) liquidar(s, gan[0]);
+  prog(gan[0].pid, { gan: 1 });
   // partida rápida (jugador real o Bot Difícil): la 1ª partida de la sala paga 90 al ganador y 10 al que pierde;
   // las revanchas pagan 30 y 5 (máximo 3 revanchas pagadas por sala). La partida debe durar 20 s o más.
   if (s.rapida && Date.now() - p.inicio >= 20000) {
@@ -248,7 +267,7 @@ io.on("connection", socket => {
   socket.on("perfil", ({ pid, nombre, stats: c, av } = {}) => {
     const k = socket.data.cuenta ? socket.data.pid : "p_" + String(pid || "").replace(/[^\w-]/g, "").slice(0, 48);
     if (k === "p_") return;
-    socket.data.pid = k; const cta = !!socket.data.cuenta;
+    socket.data.pid = k; porPid.set(k, socket); const cta = !!socket.data.cuenta;
     const x = st(k, nombre); if (nombre) x.nombre = String(nombre).slice(0, 16);
     for (const f of ["copas", "torneos", "partidas", "parejas", "gastado", "bonus"]) {
       const v = cta ? 0 : Number(c && c[f]);
@@ -273,7 +292,8 @@ io.on("connection", socket => {
     const pool = CF.filter((_, i) => RARCF[i] === rar), a = pool[Math.random() * pool.length | 0];
     const dup = x.items.includes(a), dv = [10, 20, 30, 60, 150][rar];
     if (dup) x.bonus += dv; else x.items.push(a);
-    sucio = true; socket.emit("perfil", x); cb({ ok: true, a, dup: dup ? dv : 0 });
+    sucio = true; socket.emit("perfil", x); prog(socket.data.pid, { cof: 1 });
+    cb({ ok: true, a, dup: dup ? dv : 0 });
   });
   socket.on("poder", tipo => {
     const s = sala(), p = s && s.partida, j = s && J(s, yo);
@@ -287,11 +307,12 @@ io.on("connection", socket => {
       j.pw--; p.cong = p.ids[(p.turno + 1) % p.ids.length];
       io.to(s.codigo).emit("aviso", "🧊 " + j.nombre + " congeló a " + J(s, p.cong).nombre);
     } else return;
+    prog(socket.data.pid, { pod: 1 });
     emit(s);
   });
   let intentos = 0;
   const entrarCuenta = u => {
-    socket.data.cuenta = u; socket.data.pid = "u_" + u;
+    socket.data.cuenta = u; socket.data.pid = "u_" + u; porPid.set(socket.data.pid, socket);
     const x = st(socket.data.pid, cuentas[u].nombre); x.nombre = cuentas[u].nombre; sucio = true;
     if (x.av && AVS.has(x.av)) socket.data.av = x.av;
     socket.emit("perfil", x);
@@ -317,7 +338,56 @@ io.on("connection", socket => {
     entrarCuenta(u); cb({ ok: true, usuario: u });
   });
   socket.on("logout", ({ token } = {}, cb = () => {}) => {
-    delete tokens[token]; socket.data.cuenta = null; socket.data.pid = null; sucio = true; cb({ ok: true });
+    delete tokens[token]; porPid.delete(socket.data.pid); socket.data.cuenta = null; socket.data.pid = null; sucio = true; cb({ ok: true });
+  });
+  const nom = u => (cuentas[u] || {}).nombre || u;
+  socket.on("misiones", (_, cb = () => {}) => cb(socket.data.pid ? listaMis(st(socket.data.pid)) : []));
+  socket.on("amigos", (_, cb = () => {}) => {
+    if (!socket.data.cuenta) return cb({ ok: false });
+    const x = st(socket.data.pid);
+    cb({ ok: true, l: (x.amigos || []).map(u => ({ u, n: nom(u), av: (stats["u_" + u] || {}).av || "🌸", on: !!(porPid.get("u_" + u) || {}).connected })) });
+  });
+  socket.on("amigoAgregar", ({ usuario } = {}, cb = () => {}) => {
+    if (!socket.data.cuenta) return cb({ ok: false, error: "Necesitas iniciar sesión" });
+    const u = limpiarU(usuario), x = st(socket.data.pid); x.amigos = x.amigos || [];
+    if (!cuentas[u]) return cb({ ok: false, error: "Ese usuario no existe" });
+    if (u === socket.data.cuenta) return cb({ ok: false, error: "Ese eres tú" });
+    if (x.amigos.includes(u)) return cb({ ok: false, error: "Ya es tu amigo" });
+    if (x.amigos.length >= 50) return cb({ ok: false, error: "Máximo 50 amigos" });
+    x.amigos.push(u); sucio = true; cb({ ok: true });
+  });
+  socket.on("amigoQuitar", ({ usuario } = {}, cb = () => {}) => {
+    if (!socket.data.cuenta) return cb({ ok: false });
+    const x = st(socket.data.pid); x.amigos = (x.amigos || []).filter(u => u !== usuario); sucio = true; cb({ ok: true });
+  });
+  socket.on("perfilDe", ({ usuario } = {}, cb = () => {}) => {
+    const u = limpiarU(usuario), x = cuentas[u] && stats["u_" + u];
+    if (!x) return cb({ ok: false, error: "Ese usuario no existe" });
+    const l = Object.entries(stats).filter(([k, v]) => k.startsWith("u_") && v.partidas > 0).sort(([, a], [, b]) => b.copas - a.copas || b.torneos - a.torneos || a.partidas - b.partidas);
+    const me = socket.data.cuenta && st(socket.data.pid);
+    cb({ ok: true, u, n: nom(u), av: x.av || "🌸", copas: x.copas, torneos: x.torneos, partidas: x.partidas, parejas: x.parejas,
+      pos: l.findIndex(([k]) => k === "u_" + u) + 1, amigo: !!(me && (me.amigos || []).includes(u)), on: !!(porPid.get("u_" + u) || {}).connected });
+  });
+  socket.on("retar", ({ usuario } = {}, cb = () => {}) => {
+    if (!socket.data.cuenta) return cb({ ok: false, error: "Necesitas iniciar sesión" });
+    const u = limpiarU(usuario), tp = "u_" + u, tgt = porPid.get(tp);
+    if (!(st(socket.data.pid).amigos || []).includes(u)) return cb({ ok: false, error: "Solo puedes retar a tus amigos" });
+    if (!tgt || !tgt.connected) return cb({ ok: false, error: "Tu amigo no está conectado" });
+    if (Date.now() - (socket.data.retoT || 0) < 10000) return cb({ ok: false, error: "Espera unos segundos" });
+    socket.data.retoT = Date.now();
+    retos[tp] = { u: socket.data.cuenta, socket, nuevo, t: Date.now() };
+    tgt.emit("reto", { de: nom(socket.data.cuenta), u: socket.data.cuenta }); cb({ ok: true });
+  });
+  socket.on("aceptarReto", ({ u } = {}, cb = () => {}) => {
+    const r = retos[socket.data.pid];
+    if (!r || r.u !== u || Date.now() - r.t > 30000 || !r.socket.connected) return cb({ ok: false, error: "El reto ya no está disponible" });
+    delete retos[socket.data.pid];
+    const c = cod(), s = salas[c] = { codigo: c, host: null, modo: "libre", tam: 4, fase: "espera", auto: true, jugadores: [] }, salidas = [];
+    [[r.socket, r.nuevo], [socket, nuevo]].forEach(([sk, nv]) => {
+      const id = crypto.randomUUID(), j = nv(s, id, nom(sk.data.cuenta)); j.conectado = false; j.pid = sk.data.pid; if (!s.host) s.host = id;
+      salidas.push([sk, { codigo: c, token: id, aviso: "🤝 Partida entre amigos" }]);
+    });
+    salidas.forEach(([sk, d]) => sk.emit("emparejado", d)); cb({ ok: true });
   });
   socket.on("reaccion", e => {
     const s = sala(), j = s && J(s, yo);
@@ -327,7 +397,7 @@ io.on("connection", socket => {
     const l = Object.entries(stats).filter(([k, v]) => k.startsWith("u_") && v.partidas > 0).map(([k, v]) => ({ k, ...v }))
       .sort((a, b) => b.copas - a.copas || b.torneos - a.torneos || a.partidas - b.partidas);
     const i = l.findIndex(x => x.k === socket.data.pid);
-    cb({ top: l.slice(0, 20).map(x => ({ a: x.av, n: x.nombre, c: x.copas, t: x.torneos, p: x.partidas, yo: x.k === socket.data.pid })), pos: i + 1, total: l.length, cuenta: !!socket.data.cuenta });
+    cb({ top: l.slice(0, 20).map(x => ({ u: x.k.slice(2), a: x.av, n: x.nombre, c: x.copas, t: x.torneos, p: x.partidas, yo: x.k === socket.data.pid })), pos: i + 1, total: l.length, cuenta: !!socket.data.cuenta });
   });
   socket.on("salir", () => {
     const s = sala(), j = s && J(s, yo);
@@ -383,7 +453,7 @@ io.on("connection", socket => {
     const b = socket.data.botIni; socket.data.botIni = null;
     if (!b || b.n !== n || !socket.data.pid) return cb({ ok: false });
     if (Date.now() - b.t < 15000) return cb({ ok: false, error: "Partida demasiado rápida: sin premio" });
-    const x = st(socket.data.pid); x.bonus += PREMIO[n]; sucio = true;
+    const x = st(socket.data.pid); x.bonus += PREMIO[n]; sucio = true; prog(socket.data.pid, { bot: 1 });
     socket.emit("perfil", x); cb({ ok: true, monedas: PREMIO[n] });
   });
   socket.on("buscar", ({ nombre } = {}) => {
@@ -403,6 +473,7 @@ io.on("connection", socket => {
   socket.on("cancelar", () => { cola = cola.filter(x => x.socket !== socket); difundir(); });
   socket.on("disconnect", () => {
     cola = cola.filter(x => x.socket !== socket); difundir(); colaA = colaA.filter(x => x.socket !== socket);
+    if (socket.data.pid && porPid.get(socket.data.pid) === socket) porPid.delete(socket.data.pid);
     const s = sala(); if (!s) return;
     const j = J(s, yo); if (!j || j.sid !== socket.id) return;
     if (s.fase === "espera") {
